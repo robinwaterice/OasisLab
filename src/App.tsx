@@ -3,8 +3,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -24,22 +41,123 @@ import {
   Lock,
   Unlock,
   Key,
-  Database
+  Database,
+  ShoppingBag,
+  PlusCircle,
+  Trash2,
+  Edit3,
+  Link,
+  GripVertical,
+  Star
 } from 'lucide-react';
 import { Story, Product } from './types';
 import { STORIES, HISTORICAL_STORIES, NEXT_ISSUE_STORIES, PRODUCTS } from './data';
 
+// ================== 【可拖曳排序商品列 - 獨立子元件】 ==================
+interface SortableProductRowProps {
+  product: Product;
+  isSelected: boolean;
+  isPendingDelete: boolean;
+  onSelect: () => void;
+  onDeleteRequest: () => void;
+  onDeleteConfirm: () => void;
+  onDeleteCancel: () => void;
+}
+
+function SortableProductRow({
+  product, isSelected, isPendingDelete,
+  onSelect, onDeleteRequest, onDeleteConfirm, onDeleteCancel
+}: SortableProductRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: product.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-1.5">
+      {/* 拖曳把手 */}
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="p-2 text-[#2C2C2A]/25 hover:text-[#5A6351] cursor-grab active:cursor-grabbing flex-shrink-0 touch-none"
+        title="拖曳排序"
+      >
+        <GripVertical className="w-4 h-4" />
+      </button>
+      {/* 商品選取按鈕 */}
+      <button
+        type="button"
+        onClick={onSelect}
+        className={`flex-1 flex items-center space-x-2.5 text-left px-3 py-2.5 rounded-lg text-xs font-sans-ui border transition-all cursor-pointer ${
+          isSelected
+            ? 'bg-[#5A6351] text-[#F4F4F3] border-[#5A6351] shadow-md'
+            : 'bg-[#F4F4F3]/60 text-[#2C2C2A]/70 hover:bg-[#2C2C2A]/5 border-[#2C2C2A]/10'
+        }`}
+      >
+        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+          product.status === 'active' ? 'bg-emerald-400' :
+          product.status === 'pending' ? 'bg-amber-400' : 'bg-gray-300'
+        }`} />
+        <span className="flex-1 line-clamp-1 leading-snug font-semibold">{product.title_optimized}</span>
+        {product.is_popular && (
+          <Star className={`w-3 h-3 flex-shrink-0 ${isSelected ? 'text-amber-300 fill-amber-300' : 'text-amber-400 fill-amber-400'}`} />
+        )}
+      </button>
+      {/* 刪除按鈕（兩步確認） */}
+      {isPendingDelete ? (
+        <div className="flex flex-col gap-1 flex-shrink-0">
+          <button type="button" onClick={onDeleteConfirm}
+            className="px-2 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-[10px] font-bold font-sans-ui cursor-pointer transition-colors"
+          >確認</button>
+          <button type="button" onClick={onDeleteCancel}
+            className="px-2 py-1 bg-[#2C2C2A]/8 hover:bg-[#2C2C2A]/15 text-[#2C2C2A]/60 rounded text-[10px] font-sans-ui cursor-pointer transition-colors"
+          >取消</button>
+        </div>
+      ) : (
+        <button type="button" title="刪除此商品" onClick={(e) => { e.stopPropagation(); onDeleteRequest(); }}
+          className="p-2 rounded-lg text-[#2C2C2A]/30 hover:text-red-500 hover:bg-red-50 border border-[#2C2C2A]/8 hover:border-red-200 transition-all cursor-pointer flex-shrink-0"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   // 狀態管理：目前所在的頁面。'cover' 代表封面首頁，story 的 id 代表具體專體內頁
   const [currentView, setCurrentView] = useState<string>('cover');
-  const [activeStories, setActiveStories] = useState<Story[]>(STORIES);
-  const [archivedStories, setArchivedStories] = useState<Story[]>(HISTORICAL_STORIES);
-  const [currentIssueNumber, setCurrentIssueNumber] = useState<number>(25);
+  const [activeStories, setActiveStories] = useState<Story[]>(() => {
+    try {
+      const saved = localStorage.getItem('oasis_active_stories_v1');
+      if (saved) return JSON.parse(saved) as Story[];
+    } catch (e) {}
+    return STORIES;
+  });
+  const [archivedStories, setArchivedStories] = useState<Story[]>(() => {
+    try {
+      const saved = localStorage.getItem('oasis_archived_stories_v1');
+      if (saved) return JSON.parse(saved) as Story[];
+    } catch (e) {}
+    return HISTORICAL_STORIES;
+  });
+  const [currentIssueNumber, setCurrentIssueNumber] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('oasis_issue_number_v1');
+      if (saved) return parseInt(saved, 10);
+    } catch (e) {}
+    return 25;
+  });
   const [savedProducts, setSavedProducts] = useState<string[]>([]);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [shopFilter, setShopFilter] = useState<string>('all');
   const [activeReferral, setActiveReferral] = useState<Product | null>(null);
+  const [selectedProductDetail, setSelectedProductDetail] = useState<Product | null>(null);
 
   // 管理者頁面登入與管理狀態
   const [adminUsername, setAdminUsername] = useState<string>('');
@@ -62,6 +180,43 @@ export default function App() {
   const [editTitle, setEditTitle] = useState<string>('');
   const [editDescription, setEditDescription] = useState<string>('');
   const [editContent, setEditContent] = useState<string>('');
+
+  // 後台 Shop 商品管理狀態
+  const [editableProducts, setEditableProducts] = useState<Product[]>(() => {
+    try {
+      const saved = localStorage.getItem('oasis_editable_products_v1');
+      if (saved) return JSON.parse(saved) as Product[];
+    } catch (e) {}
+    return PRODUCTS;
+  });
+  const [selectedEditProductId, setSelectedEditProductId] = useState<string>('');
+  const [editProductTitle, setEditProductTitle] = useState<string>('');
+  const [editProductPrice, setEditProductPrice] = useState<string>('');
+  const [editProductUrl, setEditProductUrl] = useState<string>('');
+  const [editProductBtnText, setEditProductBtnText] = useState<string>('');
+  const [editProductDescription, setEditProductDescription] = useState<string>('');
+  const [editProductImageUrl, setEditProductImageUrl] = useState<string>('');
+  const [editProductTags, setEditProductTags] = useState<string>('');
+  const [editProductStatus, setEditProductStatus] = useState<'active' | 'pending' | 'draft'>('active');
+  const [editProductIsPopular, setEditProductIsPopular] = useState<boolean>(false);
+  const [confirmDeleteProductId, setConfirmDeleteProductId] = useState<string>('');
+
+  // DnD 感應器設定
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = editableProducts.findIndex(p => p.id === active.id);
+      const newIndex = editableProducts.findIndex(p => p.id === over.id);
+      const reordered = arrayMove(editableProducts, oldIndex, newIndex);
+      setEditableProducts(reordered);
+      try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(reordered)); } catch(e) {}
+    }
+  };
 
   // 依期數動態計算月份與年度，May 2026 為第 25 期基底
   const getIssueDate = (issueNum: number) => {
@@ -137,6 +292,25 @@ export default function App() {
     } catch (e) {}
   }, [productClicks]);
 
+  // 💾 持久化儲存：AI 生成的專題與期數，避免重整後消失
+  useEffect(() => {
+    try {
+      localStorage.setItem('oasis_active_stories_v1', JSON.stringify(activeStories));
+    } catch (e) {}
+  }, [activeStories]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('oasis_archived_stories_v1', JSON.stringify(archivedStories));
+    } catch (e) {}
+  }, [archivedStories]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('oasis_issue_number_v1', String(currentIssueNumber));
+    } catch (e) {}
+  }, [currentIssueNumber]);
+
   // 開啟專題細閱之輔助函數（自動登載實際點擊點數）
   const handleViewStory = (storyId: string) => {
     setStoryClicks(prev => ({
@@ -145,6 +319,20 @@ export default function App() {
     }));
     setCurrentView(storyId);
     window.scrollTo({ top: 0, behavior: 'instant' });
+  };
+
+  // 處理商品導購重定向，並增加查看數
+  const handleProductRedirect = (product: Product) => {
+    setActiveReferral(product);
+  };
+
+  // 開啟商品沈浸式詳情介紹，並增加查看數
+  const handleOpenProductDetail = (product: Product) => {
+    setProductClicks(prev => ({
+      ...prev,
+      [product.id]: (prev[product.id] || 0) + 1
+    }));
+    setSelectedProductDetail(product);
   };
 
   // PWA (Progressive Web App) 狀態
@@ -211,7 +399,7 @@ export default function App() {
 
   // 根據專題的 targetTag 自動篩選出 status 為 'active' 且 tags 包含該 targetTag 的商品
   const getFilteredProducts = (story: Story) => {
-    return PRODUCTS.filter(
+    return editableProducts.filter(
       product => product.status === 'active' && product.context_tags.includes(story.targetTag)
     );
   };
@@ -669,7 +857,231 @@ export default function App() {
         )}
       </AnimatePresence>
 
-       {/* 分享故事成功提示 / 全域高質感自訂通知 */}
+      {/* ================== 【商品沈浸式詳情介紹面板 (Bento Modal)】 ================== */}
+      <AnimatePresence>
+        {selectedProductDetail && (
+          <motion.div
+            id="product-detail-modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-[#2C2C2A]/60 backdrop-blur-md overflow-y-auto"
+            onClick={() => setSelectedProductDetail(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.96, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.96, y: 20 }}
+              transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+              className="bg-[#F4F4F3] border border-[#2C2C2A]/10 rounded-2xl md:rounded-3xl max-w-5xl w-full shadow-2xl overflow-hidden font-serif text-[#2C2C2A] flex flex-col md:grid md:grid-cols-12 max-h-[90vh] md:max-h-[85vh] relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* 左側：極美視覺區 (Bento Left) */}
+              <div className="relative md:col-span-5 h-64 md:h-full min-h-[280px] bg-[#2C2C2A]/5 overflow-hidden group">
+                <img
+                  src={selectedProductDetail.image_url}
+                  alt={selectedProductDetail.title_optimized}
+                  className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-700"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#2C2C2A]/40 via-transparent to-transparent"></div>
+
+                {/* 懸浮標籤 */}
+                <div className="absolute top-4 left-4 flex flex-wrap gap-1.5 max-w-[80%] z-10">
+                  {selectedProductDetail.context_tags.map(tag => (
+                    <span
+                      key={tag}
+                      className="px-2.5 py-1 bg-[#F4F4F3]/90 text-[10px] text-[#2C2C2A] font-sans-ui font-bold border border-[#2C2C2A]/10 rounded-md shadow-sm"
+                    >
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+
+                {/* 珍藏按鈕 */}
+                <button
+                  onClick={() => toggleSaveProduct(selectedProductDetail.id)}
+                  className="absolute top-4 right-4 p-2.5 rounded-full bg-[#F4F4F3]/90 hover:bg-[#F4F4F3] border border-[#2C2C2A]/5 text-[#2C2C2A]/70 hover:text-red-500 transition-all shadow-md cursor-pointer z-10"
+                  title={savedProducts.includes(selectedProductDetail.id) ? "取消珍藏" : "珍藏此物件"}
+                >
+                  <Heart className={`w-4 h-4 ${savedProducts.includes(selectedProductDetail.id) ? 'fill-red-500 text-red-500' : ''}`} />
+                </button>
+
+                {/* 左下底飾 */}
+                <div className="absolute bottom-6 left-6 text-[#F4F4F3] z-10 hidden md:block">
+                  <span className="font-mono-data text-[9px] tracking-[0.25em] font-extrabold uppercase opacity-80 block mb-1">
+                    DESIGN SELECTION
+                  </span>
+                  <span className="text-[10px] font-sans-ui opacity-60">
+                    Oasis Lab. Curated Product ID: {selectedProductDetail.id}
+                  </span>
+                </div>
+              </div>
+
+              {/* 右側：美學文字深度細閱區 (Bento Right) */}
+              <div className="md:col-span-7 flex flex-col justify-between overflow-y-auto max-h-[50vh] md:max-h-[85vh]">
+                {/* 頂部控制欄 */}
+                <div className="p-6 md:p-8 pb-0 flex justify-between items-center">
+                  <div className="flex items-center space-x-2 text-[#5A6351]">
+                    <Compass className="w-4 h-4" />
+                    <span className="font-sans-ui text-[10px] tracking-[0.2em] font-bold uppercase">
+                      Editorial Review // 嚴選器物評誌
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setSelectedProductDetail(null)}
+                    className="p-1.5 rounded-full hover:bg-[#2C2C2A]/5 transition-colors text-[#2C2C2A]/60 hover:text-[#2C2C2A] cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* 核心介紹內容 */}
+                <div className="p-6 md:p-8 pt-4 space-y-6 flex-grow">
+                  <div>
+                    {/* 價格標示 */}
+                    <div className="flex items-baseline space-x-2 mb-2">
+                      <span className="text-2xl font-mono-data font-bold text-[#5A6351]">
+                        {selectedProductDetail.price_display}
+                      </span>
+                      <span className="text-[10px] font-sans-ui text-[#2C2C2A]/40 uppercase tracking-wider">
+                        Curated Price
+                      </span>
+                    </div>
+
+                    {/* 商品優化標題 */}
+                    <h2 className="text-xl md:text-2xl font-extrabold tracking-tight text-[#2C2C2A] leading-snug">
+                      {selectedProductDetail.title_optimized}
+                    </h2>
+                  </div>
+
+                  {/* 一句話特點 */}
+                  <p className="text-sm text-[#2C2C2A]/80 font-medium italic border-l-2 border-[#5A6351] pl-3 py-0.5 leading-relaxed bg-[#5A6351]/3 rounded-r-md pr-3">
+                    「{selectedProductDetail.description}」
+                  </p>
+
+                  {/* 設計理念 (Story Behind) */}
+                  {selectedProductDetail.story_behind && (
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-sans-ui font-extrabold tracking-widest text-[#2C2C2A]/50 uppercase">
+                        設計理念與人文脈絡
+                      </h4>
+                      <p className="text-xs md:text-sm text-[#2C2C2A]/70 leading-relaxed font-serif text-justify whitespace-pre-line">
+                        {selectedProductDetail.story_behind}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* 三大設計亮點 (Features) */}
+                  {selectedProductDetail.features && selectedProductDetail.features.length > 0 && (
+                    <div className="space-y-3 pt-2">
+                      <h4 className="text-xs font-sans-ui font-extrabold tracking-widest text-[#2C2C2A]/50 uppercase">
+                        工藝與功能特點
+                      </h4>
+                      <div className="grid grid-cols-1 gap-2.5">
+                        {selectedProductDetail.features.map((feature, fIdx) => (
+                          <div 
+                            key={fIdx} 
+                            className="bg-white border border-[#2C2C2A]/5 rounded-lg p-3 flex items-center space-x-2.5 shadow-sm"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-[#5A6351] flex-shrink-0" />
+                            <span className="text-xs font-sans-ui font-semibold text-[#2C2C2A]/85">
+                              {feature}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 策展人美學講評 (Designer Critique) */}
+                  {selectedProductDetail.designer_critique && (
+                    <div className="bg-[#5A6351]/5 border border-[#5A6351]/15 rounded-xl p-5 md:p-6 space-y-2.5">
+                      <div className="flex items-center space-x-1.5 text-[#5A6351]">
+                        <Feather className="w-4 h-4" />
+                        <span className="font-sans-ui text-[10px] tracking-widest font-bold uppercase">
+                          Curator's Critique // 策展人講評
+                        </span>
+                      </div>
+                      <p className="text-xs md:text-sm text-[#2C2C2A]/75 font-sans-ui leading-relaxed italic">
+                        "{selectedProductDetail.designer_critique}"
+                      </p>
+                      <div className="text-right text-[10px] text-[#5A6351]/80 font-sans-ui font-bold">
+                        —— Oasis Lab. 編輯部總編輯
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 工藝與技術規格 (Specifications) */}
+                  {selectedProductDetail.specifications && selectedProductDetail.specifications.length > 0 && (
+                    <div className="space-y-3 pt-2">
+                      <h4 className="text-xs font-sans-ui font-extrabold tracking-widest text-[#2C2C2A]/50 uppercase">
+                        製品規格參數
+                      </h4>
+                      <div className="border border-[#2C2C2A]/10 rounded-lg overflow-hidden bg-white/50">
+                        <table className="w-full text-left border-collapse text-xs font-sans-ui">
+                          <tbody>
+                            {selectedProductDetail.specifications.map((spec, sIdx) => (
+                              <tr 
+                                key={sIdx} 
+                                className={`border-b border-[#2C2C2A]/5 last:border-0 ${sIdx % 2 === 0 ? 'bg-[#2C2C2A]/2' : 'bg-transparent'}`}
+                              >
+                                <td className="p-2.5 font-bold text-[#2C2C2A]/60 w-1/3 border-r border-[#2C2C2A]/5">
+                                  {spec.label}
+                                </td>
+                                <td className="p-2.5 text-[#2C2C2A]/80 font-medium">
+                                  {spec.value}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 底部導購行動欄 (Sticky Bottom CTA) */}
+                <div className="p-6 md:p-8 bg-[#F4F4F3] border-t border-[#2C2C2A]/10 flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <div className="flex flex-col text-center sm:text-left">
+                    <div className="flex items-center justify-center sm:justify-start space-x-2">
+                      <span className="font-mono-data text-[10px] text-[#2C2C2A]/40">
+                        🔥 已有 {((productClicks[selectedProductDetail.id] || 0) + (productOffsets[selectedProductDetail.id] || 500)).toLocaleString()} 次查看
+                      </span>
+                    </div>
+                    <span className="text-xs text-[#2C2C2A]/50 font-sans-ui mt-0.5">
+                      點擊按鈕即可引導至官方指定專屬平台。
+                    </span>
+                  </div>
+
+                  <div className="flex space-x-3.5 w-full sm:w-auto">
+                    <button
+                      onClick={() => {
+                        setSelectedProductDetail(null);
+                      }}
+                      className="flex-1 sm:flex-initial px-5 py-2.5 border border-[#2C2C2A]/15 hover:bg-[#2C2C2A]/5 text-xs text-[#2C2C2A]/70 font-sans-ui font-semibold rounded-lg transition-colors cursor-pointer text-center"
+                    >
+                      返回雜誌
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedProductDetail(null);
+                        handleProductRedirect(selectedProductDetail);
+                      }}
+                      className="flex-1 sm:flex-initial inline-flex items-center justify-center space-x-2 bg-[#5A6351] hover:bg-[#4E5646] text-[#F4F4F3] text-xs font-sans-ui font-bold py-2.5 px-6 shadow-[0_4px_14px_rgba(90,99,81,0.2)] rounded-lg transition-all hover:scale-101 cursor-pointer"
+                    >
+                      <span>{selectedProductDetail.btn_text}</span>
+                      <ExternalLink className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 分享故事成功提示 / 全域高質感自訂通知 */}
       <AnimatePresence>
         {copiedLink && (
           <motion.div 
@@ -943,7 +1355,7 @@ export default function App() {
               {/* 商品列表 */}
               {(() => {
                 // 根據狀態過濾產品
-                const filtered = PRODUCTS.filter(product => {
+                const filtered = editableProducts.filter(product => {
                   if (product.status !== 'active') return false;
                   if (shopFilter === 'saved') {
                     return savedProducts.includes(product.id);
@@ -986,7 +1398,10 @@ export default function App() {
                       >
                         <div>
                           {/* 圖片封面與標籤 */}
-                          <div className="relative h-56 overflow-hidden bg-[#2C2C2A]/5">
+                          <div 
+                            onClick={() => handleOpenProductDetail(product)}
+                            className="relative h-56 overflow-hidden bg-[#2C2C2A]/5 cursor-pointer"
+                          >
                             <img
                               src={product.image_url}
                               alt={product.title_optimized}
@@ -995,7 +1410,7 @@ export default function App() {
                             />
                             
                             {/* 分類標籤 */}
-                            <div className="absolute top-4 left-4 flex flex-wrap gap-1.5 max-w-[80%]">
+                            <div className="absolute top-4 left-4 flex flex-wrap gap-1.5 max-w-[75%]">
                               {product.context_tags.map(tag => (
                                 <span
                                   key={tag}
@@ -1006,16 +1421,30 @@ export default function App() {
                               ))}
                             </div>
 
+                            {/* 人氣精選徽章 */}
+                            {product.is_popular && (
+                              <div className="absolute bottom-4 left-4 flex items-center space-x-1 px-2.5 py-1 bg-[#2C2C2A]/85 backdrop-blur-sm rounded-full">
+                                <Star className="w-2.5 h-2.5 text-amber-300 fill-amber-300" />
+                                <span className="font-mono-data text-[9px] text-amber-200 font-bold tracking-widest uppercase">Popular Pick</span>
+                              </div>
+                            )}
+
                             {/* 收藏愛心 */}
                             <button
-                              onClick={() => toggleSaveProduct(product.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleSaveProduct(product.id);
+                              }}
                               className="absolute top-4 right-4 p-2 rounded-full bg-[#F4F4F3]/90 hover:bg-[#F4F4F3] border border-[#2C2C2A]/5 text-[#2C2C2A]/70 hover:text-red-500 transition-colors shadow-sm cursor-pointer"
                             >
                               <Heart className={`w-3.5 h-3.5 ${savedProducts.includes(product.id) ? 'fill-red-500 text-red-500' : ''}`} />
                             </button>
                           </div>
 
-                          <div className="p-6">
+                          <div 
+                            onClick={() => handleOpenProductDetail(product)}
+                            className="p-6 cursor-pointer"
+                          >
                             <h3 className="text-base md:text-lg font-extrabold tracking-tight text-[#2C2C2A] line-clamp-2 leading-snug mb-2.5 group-hover:text-[#5A6351] transition-colors">
                               {product.title_optimized}
                             </h3>
@@ -1042,7 +1471,7 @@ export default function App() {
                                 🔥 {((productClicks[product.id] || 0) + (productOffsets[product.id] || 500)).toLocaleString()} 次查看
                               </span>
                               <button
-                                onClick={() => handleProductRedirect(product)}
+                                onClick={() => handleOpenProductDetail(product)}
                                 className="inline-flex items-center space-x-1.5 bg-[#5A6351] hover:bg-[#4E5646] text-[#F4F4F3] text-xs font-sans-ui font-semibold py-2 px-3.5 rounded-lg shadow-sm transition-colors cursor-pointer"
                               >
                                 <span>{product.btn_text}</span>
@@ -1669,9 +2098,388 @@ export default function App() {
                     <p className="font-sans-ui text-xs text-[#2C2C2A]/60 leading-relaxed mb-6">
                       此處展示未來將加載的商品或由 AI 專家端自動分析生成的聯名內容。依據系統架構，所有新生成的商品狀態會固定標記為 <code className="bg-[#2C2C2A]/10 px-1 py-0.5 rounded text-[11px] font-mono-data text-[#2C2C2A]">status: "pending"</code>。在此可供團隊進行上架審核。
                     </p>
-                    
                     <div className="border border-dashed border-[#2C2C2A]/15 rounded-xl p-6 text-center text-xs text-[#2C2C2A]/40 font-sans-ui italic">
                       暫無審查中 (Pending) 的商品待處理。AI 智理引擎狀態良好。
+                    </div>
+                  </div>
+
+                  {/* ================== 【後台 Shop 商品編輯器】 ================== */}
+                  <div className="bg-white border border-[#2C2C2A]/10 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden">
+                    {/* 頂部標題欄 */}
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-8 pb-6 border-b border-[#2C2C2A]/8">
+                      <div className="flex items-start space-x-4">
+                        <div className="p-3 bg-[#5A6351]/10 rounded-xl text-[#5A6351]">
+                          <ShoppingBag className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <span className="font-mono-data text-[10px] text-[#5A6351] font-bold tracking-widest uppercase block mb-1">
+                            SHOP EDITOR // 選物商城管理系統
+                          </span>
+                          <h3 className="text-xl font-bold font-serif text-[#2C2C2A]">
+                            商品內容即時編輯台
+                          </h3>
+                          <p className="font-sans-ui text-xs text-[#2C2C2A]/55 leading-relaxed mt-1">
+                            選取商品後可即時修改所有欄位，儲存後前台 Shop 頁面與詳情面板將同步更新。共 {editableProducts.length} 款商品。
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setEditableProducts(PRODUCTS);
+                          try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(PRODUCTS)); } catch(e) {}
+                          setSelectedEditProductId('');
+                          triggerToast('🔄 商品資料已重置為系統預設值。');
+                        }}
+                        className="text-[10px] font-sans-ui text-red-400 hover:text-red-600 font-semibold underline transition-colors cursor-pointer whitespace-nowrap"
+                      >
+                        重置所有商品為預設值
+                      </button>
+                    </div>
+
+                    <div className="p-8 pt-6">
+                      {/* 商品選取列表 */}
+                      <div className="mb-6">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <h4 className="text-xs font-mono-data text-[#2C2C2A]/50 font-bold tracking-wider uppercase">Step 1 — 選擇要編輯的商品</h4>
+                            <p className="text-[10px] font-sans-ui text-[#2C2C2A]/35 mt-0.5 flex items-center space-x-1">
+                              <GripVertical className="w-3 h-3" />
+                              <span>可拖曳排序，前台商品順序即時更新</span>
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedEditProductId('__NEW__');
+                              setEditProductTitle('');
+                              setEditProductPrice('');
+                              setEditProductUrl('');
+                              setEditProductBtnText('探索生活靈感');
+                              setEditProductDescription('');
+                              setEditProductImageUrl('');
+                              setEditProductTags('');
+                              setEditProductStatus('active');
+                              setEditProductIsPopular(false);
+                              setConfirmDeleteProductId('');
+                            }}
+                            className="inline-flex items-center space-x-1.5 bg-[#5A6351]/10 hover:bg-[#5A6351]/20 text-[#5A6351] text-xs font-sans-ui font-bold px-3.5 py-2 rounded-lg border border-[#5A6351]/20 transition-all cursor-pointer"
+                          >
+                            <PlusCircle className="w-3.5 h-3.5" />
+                            <span>新增商品</span>
+                          </button>
+                        </div>
+                        <DndContext
+                          sensors={dndSensors}
+                          collisionDetection={closestCenter}
+                          onDragEnd={handleDragEnd}
+                        >
+                          <SortableContext
+                            items={editableProducts.map(p => p.id)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            <div className="flex flex-col gap-2">
+                              {editableProducts.map((product) => {
+                                const isSelected = product.id === selectedEditProductId;
+                                const isPendingDelete = confirmDeleteProductId === product.id;
+                                return (
+                                  <SortableProductRow
+                                    key={product.id}
+                                    product={product}
+                                    isSelected={isSelected}
+                                    isPendingDelete={isPendingDelete}
+                                    onSelect={() => {
+                                      setSelectedEditProductId(product.id);
+                                      setEditProductTitle(product.title_optimized);
+                                      setEditProductPrice(product.price_display);
+                                      setEditProductUrl(product.affiliate_url);
+                                      setEditProductBtnText(product.btn_text);
+                                      setEditProductDescription(product.description);
+                                      setEditProductImageUrl(product.image_url);
+                                      setEditProductTags(product.context_tags.join(', '));
+                                      setEditProductStatus(product.status);
+                                      setEditProductIsPopular(product.is_popular ?? false);
+                                      setConfirmDeleteProductId('');
+                                    }}
+                                    onDeleteRequest={() => setConfirmDeleteProductId(product.id)}
+                                    onDeleteConfirm={() => {
+                                      const next = editableProducts.filter(p => p.id !== product.id);
+                                      setEditableProducts(next);
+                                      try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(next)); } catch(e) {}
+                                      setConfirmDeleteProductId('');
+                                      if (selectedEditProductId === product.id) setSelectedEditProductId('');
+                                      triggerToast(`🗑️ 商品《${product.title_optimized.slice(0,12)}...》已刪除，前台即時同步移除。`);
+                                    }}
+                                    onDeleteCancel={() => setConfirmDeleteProductId('')}
+                                  />
+                                );
+                              })}
+                            </div>
+                          </SortableContext>
+                        </DndContext>
+                      </div>
+
+                      {/* 編輯 / 新增 表單 */}
+                      {(selectedEditProductId && (selectedEditProductId === '__NEW__' || editableProducts.find(p => p.id === selectedEditProductId))) && (
+                        <motion.div
+                          key={selectedEditProductId}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3 }}
+                          className="border-t border-[#2C2C2A]/8 pt-6 space-y-5"
+                        >
+                          <h4 className="text-xs font-mono-data text-[#2C2C2A]/50 font-bold tracking-wider uppercase flex items-center justify-between">
+                            <span className="flex items-center space-x-2">
+                              {selectedEditProductId === '__NEW__' ? <PlusCircle className="w-3.5 h-3.5 text-[#5A6351]" /> : <Edit3 className="w-3.5 h-3.5" />}
+                              <span>{selectedEditProductId === '__NEW__' ? 'New Product — 新增商品資料' : 'Step 2 — 編輯商品內容欄位'}</span>
+                            </span>
+                          </h4>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            {/* 商品名稱 */}
+                            <div className="md:col-span-2">
+                              <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">商品優化標題</label>
+                              <input
+                                type="text"
+                                value={editProductTitle}
+                                onChange={(e) => setEditProductTitle(e.target.value)}
+                                placeholder="商品的完整優化標題"
+                                className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-serif font-bold text-sm transition-all"
+                              />
+                            </div>
+
+                            {/* 價格 */}
+                            <div>
+                              <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">價格顯示文字</label>
+                              <input
+                                type="text"
+                                value={editProductPrice}
+                                onChange={(e) => setEditProductPrice(e.target.value)}
+                                placeholder="例：NT$ 1,980 或 洽詢優惠"
+                                className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-mono-data transition-all"
+                              />
+                            </div>
+
+                            {/* 按鈕文字 */}
+                            <div>
+                              <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">導購按鈕文字</label>
+                              <input
+                                type="text"
+                                value={editProductBtnText}
+                                onChange={(e) => setEditProductBtnText(e.target.value)}
+                                placeholder="例：探索生活靈感、前往選購"
+                                className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui transition-all"
+                              />
+                            </div>
+
+                            {/* 購買連結 */}
+                            <div className="md:col-span-2">
+                              <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2 flex items-center space-x-1.5">
+                                <Link className="w-3 h-3" />
+                                <span>聯盟行銷 / 購買連結 (Affiliate URL)</span>
+                              </label>
+                              <input
+                                type="url"
+                                value={editProductUrl}
+                                onChange={(e) => setEditProductUrl(e.target.value)}
+                                placeholder="https://www.momoshop.com.tw/..."
+                                className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-mono-data transition-all"
+                              />
+                            </div>
+
+                            {/* 商品圖片 URL */}
+                            <div className="md:col-span-2">
+                              <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">商品圖片 URL</label>
+                              <div className="flex gap-3">
+                                <input
+                                  type="url"
+                                  value={editProductImageUrl}
+                                  onChange={(e) => setEditProductImageUrl(e.target.value)}
+                                  placeholder="https://images.unsplash.com/..."
+                                  className="flex-1 bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-mono-data transition-all"
+                                />
+                                {editProductImageUrl && (
+                                  <div className="w-14 h-14 rounded-lg overflow-hidden border border-[#2C2C2A]/10 flex-shrink-0">
+                                    <img src={editProductImageUrl} alt="預覽" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* 分類標籤 */}
+                            <div>
+                              <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">分類標籤 (逗號分隔)</label>
+                              <input
+                                type="text"
+                                value={editProductTags}
+                                onChange={(e) => setEditProductTags(e.target.value)}
+                                placeholder="日常充電, 辦公室必備, 極簡旅行"
+                                className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui transition-all"
+                              />
+                              <p className="text-[10px] text-[#2C2C2A]/40 font-sans-ui mt-1">可用值：日常充電 / 辦公室必備 / 極簡旅行</p>
+                            </div>
+
+                            {/* 上架狀態 + 人氣商品 */}
+                            <div>
+                              <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">商品上架狀態</label>
+                              <div className="flex gap-2">
+                                {(['active', 'pending', 'draft'] as const).map((s) => (
+                                  <button
+                                    key={s}
+                                    type="button"
+                                    onClick={() => setEditProductStatus(s)}
+                                    className={`flex-1 px-3 py-2.5 rounded-lg text-xs font-sans-ui font-bold border transition-all cursor-pointer ${
+                                      editProductStatus === s
+                                        ? s === 'active' ? 'bg-emerald-500 text-white border-emerald-500'
+                                          : s === 'pending' ? 'bg-amber-400 text-white border-amber-400'
+                                          : 'bg-gray-400 text-white border-gray-400'
+                                        : 'bg-[#F4F4F3]/50 text-[#2C2C2A]/60 border-[#2C2C2A]/10 hover:bg-[#2C2C2A]/5'
+                                    }`}
+                                  >
+                                    {s === 'active' ? '🟢 上架' : s === 'pending' ? '🟡 待審' : '⚫ 草稿'}
+                                  </button>
+                                ))}
+                              </div>
+                              {/* 人氣商品開關 */}
+                              <div className="mt-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditProductIsPopular(!editProductIsPopular)}
+                                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all cursor-pointer ${
+                                    editProductIsPopular
+                                      ? 'bg-amber-50 border-amber-300 text-amber-700'
+                                      : 'bg-[#F4F4F3]/50 border-[#2C2C2A]/10 text-[#2C2C2A]/50 hover:border-[#2C2C2A]/20'
+                                  }`}
+                                >
+                                  <div className="flex items-center space-x-2.5">
+                                    <Star className={`w-4 h-4 ${
+                                      editProductIsPopular ? 'text-amber-400 fill-amber-400' : 'text-[#2C2C2A]/30'
+                                    }`} />
+                                    <div className="text-left">
+                                      <p className="text-xs font-sans-ui font-bold">人氣精選 Popular Pick</p>
+                                      <p className="text-[10px] font-sans-ui opacity-70">影響前台商品卡片顯示金色徽章</p>
+                                    </div>
+                                  </div>
+                                  <div className={`w-10 h-5 rounded-full transition-all relative ${
+                                    editProductIsPopular ? 'bg-amber-400' : 'bg-[#2C2C2A]/15'
+                                  }`}>
+                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${
+                                      editProductIsPopular ? 'left-5.5' : 'left-0.5'
+                                    }`} />
+                                  </div>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* 商品簡介描述 */}
+                            <div className="md:col-span-2">
+                              <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">商品一句話特點描述</label>
+                              <textarea
+                                rows={3}
+                                value={editProductDescription}
+                                onChange={(e) => setEditProductDescription(e.target.value)}
+                                placeholder="簡明扼要地描述此商品最核心的功能亮點與適用族群..."
+                                className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui leading-relaxed transition-all resize-none"
+                              />
+                            </div>
+                          </div>
+
+                          {/* 儲存按鈕區 */}
+                          <div className="flex flex-col sm:flex-row gap-3 pt-3 border-t border-[#2C2C2A]/8">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (selectedEditProductId === '__NEW__') {
+                                  // 新增商品
+                                  const newId = `prod-custom-${Date.now()}`;
+                                  const newProduct: Product = {
+                                    id: newId,
+                                    title_optimized: editProductTitle || '新商品',
+                                    price_display: editProductPrice || 'NT$ 0',
+                                    affiliate_url: editProductUrl || '#',
+                                    btn_text: editProductBtnText || '查看商品',
+                                    context_tags: editProductTags.split(',').map(t => t.trim()).filter(Boolean),
+                                    status: editProductStatus,
+                                    is_popular: editProductIsPopular,
+                                    image_url: editProductImageUrl || 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=600&q=80',
+                                    description: editProductDescription || ''
+                                  };
+                                  const next = [...editableProducts, newProduct];
+                                  setEditableProducts(next);
+                                  try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(next)); } catch(e) {}
+                                  setSelectedEditProductId(newId);
+                                  triggerToast(`🎉 新商品《${(editProductTitle || '新商品').slice(0,15)}》已成功新增並上架至前台 Shop！`);
+                                } else {
+                                  // 更新商品
+                                  const updatedProducts = editableProducts.map(p => {
+                                    if (p.id !== selectedEditProductId) return p;
+                                    return {
+                                      ...p,
+                                      title_optimized: editProductTitle,
+                                      price_display: editProductPrice,
+                                      affiliate_url: editProductUrl,
+                                      btn_text: editProductBtnText,
+                                      description: editProductDescription,
+                                      image_url: editProductImageUrl,
+                                      context_tags: editProductTags.split(',').map(t => t.trim()).filter(Boolean),
+                                      status: editProductStatus,
+                                      is_popular: editProductIsPopular
+                                    };
+                                  });
+                                  setEditableProducts(updatedProducts);
+                                  try {
+                                    localStorage.setItem('oasis_editable_products_v1', JSON.stringify(updatedProducts));
+                                  } catch(e) {}
+                                  triggerToast(`✨ 商品《${editProductTitle.slice(0, 15)}...》已成功更新並即時同步至前台！`);
+                                }
+                              }}
+                              className="flex-1 sm:flex-initial bg-[#5A6351] hover:bg-[#4E5646] text-white font-sans-ui text-xs font-bold py-3 px-6 rounded-lg cursor-pointer transition-all flex items-center justify-center space-x-2 shadow-md hover:shadow-lg"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                              <span>{selectedEditProductId === '__NEW__' ? '建立並上架新商品' : '儲存並發布此商品變更'}</span>
+                            </button>
+                            {selectedEditProductId !== '__NEW__' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (confirmDeleteProductId === selectedEditProductId) {
+                                    const next = editableProducts.filter(p => p.id !== selectedEditProductId);
+                                    setEditableProducts(next);
+                                    try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(next)); } catch(e) {}
+                                    setSelectedEditProductId('');
+                                    setConfirmDeleteProductId('');
+                                    triggerToast(`🗑️ 商品《${editProductTitle.slice(0,12)}...》已已刪除，前台即時同步移除。`);
+                                  } else {
+                                    setConfirmDeleteProductId(selectedEditProductId);
+                                  }
+                                }}
+                                className={`px-5 py-3 text-xs font-sans-ui font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
+                                  confirmDeleteProductId === selectedEditProductId
+                                    ? 'bg-red-500 hover:bg-red-600 text-white border border-red-500'
+                                    : 'border border-red-200 hover:bg-red-50 text-red-400 hover:text-red-600'
+                                }`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>{confirmDeleteProductId === selectedEditProductId ? '再次點擊確認刪除' : '刪除此商品'}</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => { setSelectedEditProductId(''); setConfirmDeleteProductId(''); }}
+                              className="px-5 py-3 border border-[#2C2C2A]/15 hover:bg-[#2C2C2A]/5 text-xs text-[#2C2C2A]/60 font-sans-ui font-semibold rounded-lg transition-colors cursor-pointer"
+                            >
+                              取消
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {!selectedEditProductId && (
+                        <div className="border border-dashed border-[#5A6351]/20 rounded-xl p-8 text-center mt-4">
+                          <ShoppingBag className="w-10 h-10 mx-auto text-[#5A6351]/30 mb-3" />
+                          <p className="font-sans-ui text-sm text-[#2C2C2A]/40 font-medium">請從上方選取一款商品進行編輯，或點擊《新增商品》新增一筆</p>
+                          <p className="font-sans-ui text-xs text-[#2C2C2A]/30 mt-1">所有欄位修改即時同步，無需重新整理頁面</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </motion.div>
@@ -1838,7 +2646,10 @@ export default function App() {
                         >
                           <div>
                             {/* 商品圖片與懸停效果 */}
-                            <div className="relative h-64 overflow-hidden bg-[#2C2C2A]/5 group">
+                            <div 
+                              onClick={() => handleOpenProductDetail(product)}
+                              className="relative h-64 overflow-hidden bg-[#2C2C2A]/5 group cursor-pointer"
+                            >
                               <img 
                                 src={product.image_url} 
                                 alt={product.title_optimized}
@@ -1863,7 +2674,10 @@ export default function App() {
 
                               {/* 收藏按鈕 */}
                               <button 
-                                onClick={() => toggleSaveProduct(product.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleSaveProduct(product.id);
+                                }}
                                 className="absolute top-4 right-4 p-2 rounded-full bg-[#F4F4F3]/90 hover:bg-[#F4F4F3] border border-[#2C2C2A]/5 text-[#2C2C2A]/70 hover:text-red-500 transition-colors shadow-sm cursor-pointer"
                                 title={savedProducts.includes(product.id) ? "取消珍藏" : "珍藏此物件"}
                               >
@@ -1872,7 +2686,10 @@ export default function App() {
                             </div>
 
                             {/* 商品描述與優化標題 */}
-                            <div className="p-6 md:p-8">
+                            <div 
+                              onClick={() => handleOpenProductDetail(product)}
+                              className="p-6 md:p-8 cursor-pointer"
+                            >
                               <h4 className="text-lg md:text-xl font-extrabold tracking-tight text-[#2C2C2A] line-clamp-2 leading-snug mb-3">
                                 {product.title_optimized}
                               </h4>
@@ -1899,7 +2716,7 @@ export default function App() {
                                   🔥 {((productClicks[product.id] || 0) + (productOffsets[product.id] || 500)).toLocaleString()} 次查看
                                 </span>
                                 <button
-                                  onClick={() => handleProductRedirect(product)}
+                                  onClick={() => handleOpenProductDetail(product)}
                                   className="inline-flex items-center space-x-2 bg-[#5A6351] hover:bg-[#4E5646] text-[#F4F4F3] text-xs font-sans-ui font-semibold py-2 px-4 shadow-[0_2px_10px_rgba(90,99,81,0.15)] rounded-lg transition-colors cursor-pointer"
                                 >
                                   <span>{product.btn_text}</span>

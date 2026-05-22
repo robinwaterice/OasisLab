@@ -25,6 +25,12 @@ export interface Product {
   btn_text: string;
   context_tags: string[];
   status: 'active' | 'pending' | 'draft';
+  is_popular?: boolean; // 人氣商品標記，前台顯示「人氣精選」徽章
   image_url: string; // 商品質感模擬圖
   description: string; // 商品一句話特點描述
+  story_behind?: string; // 精美的商品設計故事與理念
+  features?: string[]; // 精美的三大設計亮點
+  specifications?: { label: string; value: string }[]; // 完整的工藝或技術規格
+  designer_critique?: string; // 策展人/主編的深度美學講評
 }
+
