@@ -1,0 +1,27 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Noto Serif TC", "Noto Serif", Georgia, Cambria, serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+/* Custom Scrollbar and layout enhancements */
+body {
+  font-family: var(--font-serif);
+  background-color: #F4F4F3;
+  color: #2C2C2A;
+}
+
+.font-sans-ui {
+  font-family: var(--font-sans);
+}
+
+.font-serif-editor {
+  font-family: var(--font-serif);
+}
+
+.font-mono-data {
+  font-family: var(--font-mono);
+}

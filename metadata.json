@@ -1,0 +1,6 @@
+{
+  "name": "Oasis Lab",
+  "description": "Oasis Lab. 現代人的生活綠洲 - 一個專為質感生活與效率打造的微策展線上雜誌電商網頁。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

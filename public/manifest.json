@@ -1,0 +1,21 @@
+{
+  "short_name": "Oasis Lab",
+  "name": "Oasis Lab. 現代人的生活綠洲",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/color/192/000000/leaf.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://img.icons8.com/color/512/000000/leaf.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#F4F4F3",
+  "theme_color": "#5A6351",
+  "display": "standalone",
+  "orientation": "portrait"
+}
