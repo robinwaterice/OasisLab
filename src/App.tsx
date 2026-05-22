@@ -34,7 +34,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState<string>('cover');
   const [activeStories, setActiveStories] = useState<Story[]>(STORIES);
   const [archivedStories, setArchivedStories] = useState<Story[]>(HISTORICAL_STORIES);
-  const [currentIssueNumber, setCurrentIssueNumber] = useState<number>(42);
+  const [currentIssueNumber, setCurrentIssueNumber] = useState<number>(25);
   const [savedProducts, setSavedProducts] = useState<string[]>([]);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -46,13 +46,17 @@ export default function App() {
   const [adminPassword, setAdminPassword] = useState<string>('');
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(false);
 
+  // AI 策展期刊生成狀態
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [generationStep, setGenerationStep] = useState<string>('idle');
+
   // 隨機偏移量（使顯示點擊數穩定且隨機，不會隨畫面重繪而頻繁亂跳）
   const [storyOffsets, setStoryOffsets] = useState<{[key: string]: number}>(() => {
     const offsets: {[key: string]: number} = {};
     const all = [...STORIES, ...HISTORICAL_STORIES, ...NEXT_ISSUE_STORIES];
     all.forEach(s => {
-      // 隨機 1000 - 1999 數字
-      offsets[s.id] = Math.floor(Math.random() * 1000) + 1000;
+      // 隨機 800 - 1999 數字
+      offsets[s.id] = Math.floor(Math.random() * 1200) + 800;
     });
     return offsets;
   });
@@ -69,27 +73,27 @@ export default function App() {
   // 實際點擊數/查看數統計 (從 localStorage 獲取或預設為一些初始演示數據)
   const [storyClicks, setStoryClicks] = useState<{[key: string]: number}>(() => {
     try {
-      const saved = localStorage.getItem('oasis_story_clicks_v1');
+      const saved = localStorage.getItem('oasis_story_clicks_v3');
       if (saved) return JSON.parse(saved);
     } catch (e) {}
-    // 預設演示用的點擊數
+    // 預設演示用的點擊數（後臺數據從0開始計算）
     const defaultClicks: {[key: string]: number} = {};
     const all = [...STORIES, ...HISTORICAL_STORIES, ...NEXT_ISSUE_STORIES];
     all.forEach(s => {
-      defaultClicks[s.id] = s.id === 'ritual' ? 24 : s.id === 'oasis-cup' ? 18 : 12;
+      defaultClicks[s.id] = 0;
     });
     return defaultClicks;
   });
 
   const [productClicks, setProductClicks] = useState<{[key: string]: number}>(() => {
     try {
-      const saved = localStorage.getItem('oasis_product_clicks_v1');
+      const saved = localStorage.getItem('oasis_product_clicks_v3');
       if (saved) return JSON.parse(saved);
     } catch (e) {}
-    // 預設演示用的商品實際點擊數
+    // 預設演示用的商品實際點擊數（後臺數據從0開始計算）
     const defaultClicks: {[key: string]: number} = {};
     PRODUCTS.forEach(p => {
-      defaultClicks[p.id] = 8;
+      defaultClicks[p.id] = 0;
     });
     return defaultClicks;
   });
@@ -97,13 +101,13 @@ export default function App() {
   // 保存統計數據至 localStorage
   useEffect(() => {
     try {
-      localStorage.setItem('oasis_story_clicks_v1', JSON.stringify(storyClicks));
+      localStorage.setItem('oasis_story_clicks_v3', JSON.stringify(storyClicks));
     } catch (e) {}
   }, [storyClicks]);
 
   useEffect(() => {
     try {
-      localStorage.setItem('oasis_product_clicks_v1', JSON.stringify(productClicks));
+      localStorage.setItem('oasis_product_clicks_v3', JSON.stringify(productClicks));
     } catch (e) {}
   }, [productClicks]);
 
@@ -171,8 +175,12 @@ export default function App() {
   };
 
 
-  // 全域故事池探尋，確保無論是當期故事或歷史已歸檔(Archive)故事，都能透過同一個詳細頁載入
-  const allStories = [...activeStories, ...archivedStories, ...NEXT_ISSUE_STORIES];
+  // 全域故事池探尋，確保無論是當期故事或歷史已歸檔(Archive)故事，都能透過同一個詳細頁載入（使用 Map 進行 id 去重以防 React Key 重複）
+  const allStories = Array.from(
+    new Map(
+      [...activeStories, ...archivedStories, ...NEXT_ISSUE_STORIES].map(s => [s.id, s])
+    ).values()
+  );
   const currentStory = allStories.find(story => story.id === currentView);
 
   // 根據專題的 targetTag 自動篩選出 status 為 'active' 且 tags 包含該 targetTag 的商品
@@ -205,6 +213,196 @@ export default function App() {
       [product.id]: (prev[product.id] || 0) + 1
     }));
     setActiveReferral(product);
+  };
+
+  // 聯網搜尋趨勢與動態 AI 策展下一期專題
+  const handleGenerateNextIssue = async () => {
+    setIsGenerating(true);
+    setGenerationStep('searching');
+    
+    try {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey || apiKey.trim() === '' || apiKey.startsWith('nvapi-')) {
+        throw new Error('API Key is missing or invalid. Please configure a valid VITE_GEMINI_API_KEY in .env.local.');
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1800));
+      setGenerationStep('writing');
+
+      const systemInstructions = `你是一位享譽國際的極簡生活美學雜誌《Oasis Lab.》的總編輯。
+你對現代都市人的生活方式有著深刻的理解，文筆溫潤、優雅、富有哲思與詩意。
+你的任務是為最新一期雜誌《ISSUE 026 // JUN 2026》策劃、撰寫三篇高質感的原創專題文章。
+
+請務必在生成前使用 Google Search 工具搜尋 2026/2027 最新最受歡迎的數位游牧工具、辦公美學配置、極簡主義產品與旅行新趨勢，並在文章中融入 these 具體的實時資訊。
+
+這三篇文章必須分別對應以下四個主題中的【三個不同主題】（即每篇文章的主題分類不同）：
+1. 游牧數位 (Digital Nomad) - 對應的 targetTag 為 '日常充電'，Emoji 可選 '💻' 或 '🔋'。
+2. 辦公美學 (Office Aesthetics) - 對應的 targetTag 為 '辦公室必備'，Emoji 可選 '☕' 或 '⌨️'。
+3. 極簡美學 (Minimalist Aesthetics) - 對應的 targetTag 為 '日常充電' 或 '辦公室必備'，Emoji 可選 '🌿' 或 '🕯️'。
+4. 旅行 (Travel) - 對應的 targetTag 為 '極簡旅行'，Emoji 可選 '✈️' 或 '🏕️'。
+
+【寫作指導風格】：
+- 文字風格必須是散發文藝氣息的繁體中文，行文高雅精緻，段落分明，富有生活儀式感。
+- 每篇文章的 'content' 欄位必須是長篇深度文章（至少 3-4 個段落），不要有任何 markdown 代碼標記（如 \`\`\` 等），使用換行符 (\\n) 分割段落。
+
+【封面圖配對】：
+請為每篇文章的 'coverImage' 欄位，從以下為您精心整理的視覺美學清單中，挑選最符合該主題的一張【完整 URL】：
+* 游牧數位 用圖：
+  - https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1200&q=80
+  - https://images.unsplash.com/photo-1504607798333-52a30db54a5d?auto=format&fit=crop&w=1200&q=80
+  - https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80
+  - https://images.unsplash.com/photo-1527689368864-3a821dbccc34?auto=format&fit=crop&w=1200&q=80
+* 辦公美學 用圖：
+  - https://images.unsplash.com/photo-1493934558415-9d19f0b2b4d2?auto=format&fit=crop&w=1200&q=80
+  - https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1200&q=80
+  - https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80
+  - https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=1200&q=80
+* 極簡美學 用圖：
+  - https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=1200&q=80
+  - https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=1200&q=80
+  - https://images.unsplash.com/photo-1507652313519-d4e9174996dd?auto=format&fit=crop&w=1200&q=80
+  - https://images.unsplash.com/photo-1540518614846-7eded433c457?auto=format&fit=crop&w=1200&q=80
+* 旅行 用圖：
+  - https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=1200&q=80
+  - https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&w=1200&q=80
+  - https://images.unsplash.com/photo-1506929562872-bb421503ef21?auto=format&fit=crop&w=1200&q=80
+  - https://images.unsplash.com/photo-1539635278303-d4002c07eae3?auto=format&fit=crop&w=1200&q=80
+
+請直接輸出符合以下 Story Schema 的 JSON 陣列，直接使用 \`\`\`json ... \`\`\` 區塊包裹輸出。所有文字內容必須是繁體中文！其中 Schema 的每個物件格式如下：
+{
+  "id": "story-g0X (Unique ID starting with story-g01, story-g02, story-g03)",
+  "icon": "單個 Emoji",
+  "subtitle": "STORY 0X // [主題名稱]",
+  "title": "文藝雅緻且富有哲思的標題",
+  "description": "1-2 句極具吸引力的摘要說明",
+  "content": "深度極簡慢活美學文章（至少 3-4 個段落，行文溫潤優雅，段落間用 \\n 隔開，不要帶額外 markdown 標記）",
+  "targetTag": "日常充電 或 辦公室必備 或 極簡旅行 (必須完全一致，不能寫其他內容)",
+  "coverImage": "從上方清單挑選的最佳 Unsplash URL",
+  "author": "編輯姓名，如 '主編・Elian'",
+  "readTime": "閱讀時間，如 '4 Mins Read'",
+  "date": "必須為 'ISSUE 026 // JUN 2026'"
+}
+請勿輸出任何 Schema 定義本身、任何額外的 Markdown 代碼解釋或問候，只需輸出包裹在 \`\`\`json 內的故事 JSON 陣列即可。`;
+
+      const userPrompt = `為最新期 ISSUE 026 雜誌生成 3 篇具備實時 Google 搜尋趨勢的精緻專題文章。請徹底搜尋並融入 2026-2027 最熱門的數位游牧、辦公美學配置、極簡生活與旅行新趨勢，並以 JSON 陣列輸出符合系統架構的故事。`;
+
+      const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+      const requestBody = {
+        contents: [
+          {
+            parts: [
+              {
+                text: userPrompt
+              }
+            ]
+          }
+        ],
+        system_instruction: {
+          parts: [
+            {
+              text: systemInstructions
+            }
+          ]
+        },
+        tools: [
+          {
+            google_search: {}
+          }
+        ],
+        generation_config: {
+          temperature: 0.7,
+          response_mime_type: "text/plain"
+        }
+      };
+
+      const apiResponse = await fetch(apiEndpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!apiResponse.ok) {
+        const errDetails = await apiResponse.json().catch(() => ({}));
+        throw new Error((errDetails as any)?.error?.message || `API HTTP error! Status: ${apiResponse.status}`);
+      }
+
+      const resData = await apiResponse.json();
+      const rawText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!rawText) {
+        throw new Error('Could not retrieve curated stories text from Gemini API response.');
+      }
+
+      setGenerationStep('designing');
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      setGenerationStep('formatting');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      const parsedStories = (() => {
+        let jsonStr = rawText.trim();
+        const matches = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (matches && matches[1]) {
+          jsonStr = matches[1].trim();
+        }
+        return JSON.parse(jsonStr) as Story[];
+      })();
+
+      if (!Array.isArray(parsedStories) || parsedStories.length < 3) {
+        throw new Error('Curated stories array format is incorrect or incomplete.');
+      }
+
+      // 歷史期刊存檔輪轉
+      setArchivedStories(prev => {
+        if (prev.some(s => s.id === activeStories[0].id)) {
+          return prev;
+        }
+        const merged = [...activeStories, ...prev];
+        return Array.from(new Map(merged.map(s => [s.id, s])).values());
+      });
+      setActiveStories(parsedStories);
+      setStoryOffsets(prev => {
+        const nextOffsets = { ...prev };
+        parsedStories.forEach(s => {
+          if (!nextOffsets[s.id]) {
+            nextOffsets[s.id] = Math.floor(Math.random() * 1200) + 800;
+          }
+        });
+        return nextOffsets;
+      });
+      setCurrentIssueNumber(26);
+      triggerToast('✨ 聯網搜尋與 AI 寫作成功！已為您發行全新第 026 期高質感專題期刊！');
+
+    } catch (error: any) {
+      console.error('AI Journal Curation Error:', error);
+      
+      // 降級容錯處理
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      setArchivedStories(prev => {
+        if (prev.some(s => s.id === activeStories[0].id)) {
+          return prev;
+        }
+        const merged = [...activeStories, ...prev];
+        return Array.from(new Map(merged.map(s => [s.id, s])).values());
+      });
+      setActiveStories(NEXT_ISSUE_STORIES);
+      setStoryOffsets(prev => {
+        const nextOffsets = { ...prev };
+        NEXT_ISSUE_STORIES.forEach(s => {
+          if (!nextOffsets[s.id]) {
+            nextOffsets[s.id] = Math.floor(Math.random() * 1200) + 800;
+          }
+        });
+        return nextOffsets;
+      });
+      setCurrentIssueNumber(26);
+      
+      triggerToast(`⚠️ 聯網搜尋呼叫失敗（${error.message || '網路異常'}），已安全降級加載內置預置 026 期美學專題。`);
+    } finally {
+      setIsGenerating(false);
+      setGenerationStep('idle');
+    }
   };
 
   return (
@@ -249,6 +447,64 @@ export default function App() {
           </nav>
         </div>
       </header>
+
+      {/* 頂級 AI 策展加載遮罩 */}
+      <AnimatePresence>
+        {isGenerating && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-white/80 backdrop-blur-xl flex flex-col justify-center items-center p-6 text-center select-none"
+          >
+            <div className="max-w-md w-full space-y-8 flex flex-col items-center">
+              {/* 美麗流暢的加載圈 */}
+              <div className="relative w-24 h-24">
+                {/* 裝飾背景圈 */}
+                <div className="absolute inset-0 rounded-full border-4 border-[#5A6351]/10"></div>
+                {/* 動態旋轉圈 */}
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 1.8, ease: "linear" }}
+                  className="absolute inset-0 rounded-full border-4 border-t-[#5A6351] border-r-transparent border-b-transparent border-l-transparent"
+                ></motion.div>
+                {/* 核心閃爍圖標 */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Sparkles className="w-8 h-8 text-[#5A6351] animate-pulse" />
+                </div>
+              </div>
+
+              {/* 步驟提示字元 */}
+              <div className="space-y-3">
+                <span className="font-mono-data text-xs tracking-[0.25em] text-[#5A6351] font-extrabold uppercase block animate-pulse">
+                  Oasis Lab. AI Journal Curator // AI 策展編輯
+                </span>
+                
+                <h3 className="font-serif text-lg md:text-xl font-bold text-[#2C2C2A] h-12 flex items-center justify-center">
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={generationStep}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      {generationStep === 'searching' && "🔍 正在透過 Google 搜尋最新跨界潮流與選物趨勢..."}
+                      {generationStep === 'writing' && "✍️ 總編輯親自撰稿中：調製極簡美學與人文語調..."}
+                      {generationStep === 'designing' && "🎨 正在挑選專屬高清 Unsplash 視覺影像與版面編排..."}
+                      {generationStep === 'formatting' && "✨ 正在對齊 Story Schema 與商品關聯選物資料庫..."}
+                    </motion.span>
+                  </AnimatePresence>
+                </h3>
+
+                <p className="font-sans-ui text-xs text-[#2C2C2A]/50 max-w-sm mx-auto leading-relaxed">
+                  為了維護 Oasis Lab 的極致品味，我們使用 Google Search Grounding 聯網技術獲取真實世界的最新話題，並嚴格遵循 Bento-Grid 高規設計體系進行排版，整個過程需要約 5-8 秒鐘，感謝您的優雅等待。
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* 轉跳提示與預約平台模組（防止 Sandbox 的 window.open 被阻擋，優雅提示） */}
       <AnimatePresence>
@@ -997,44 +1253,41 @@ export default function App() {
                       <div className="bg-[#F4F4F3] border border-[#2C2C2A]/5 p-6 rounded-xl space-y-3">
                         <h4 className="font-serif font-bold text-sm text-[#2C2C2A]">發行模擬說明</h4>
                         <ul className="list-disc pl-4 space-y-2 text-xs text-[#2C2C2A]/60 font-sans-ui mb-2">
-                          <li>一鍵「推出下一期刊物 (ISSUE 043)」後，系統數據會全線更新。</li>
+                          <li>一鍵「推出下一期刊物 (ISSUE 026)」後，系統數據會全線更新。</li>
                           <li>當前首頁的三大主題：《專注的儀式》、《隨身的微型綠洲》、《極簡主義行囊》將會自動移入「歷史期刊 (Archive)」存盤。</li>
-                          <li>系統首頁封面會煥然一新，加載全新第 043 期的一組精選靈感。</li>
+                          <li>系統首頁封面會煥然一新，加載全新第 026 期的一組精選靈感。</li>
                         </ul>
                       </div>
 
                       <div className="flex flex-col justify-center items-center p-6 bg-[#5A6351]/5 border border-[#5A6351]/10 rounded-xl text-center">
                         <p className="font-mono-data text-xs text-[#5A6351] font-bold tracking-widest mb-2 uppercase font-semibold">ACTION CENTER // 策展動作</p>
-                        <p className="text-xs text-[#2C2C2A]/60 mb-6 font-sans-ui">當前發行狀態：{currentIssueNumber === 42 ? "待發行新期刊" : "已發布 043 特刊"}</p>
+                        <p className="text-xs text-[#2C2C2A]/60 mb-6 font-sans-ui">當前發行狀態：{currentIssueNumber === 25 ? "待發行新期刊" : "已發布 026 特刊"}</p>
                         
                         <div className="w-full max-w-xs space-y-3">
-                          {currentIssueNumber === 42 ? (
+                          {currentIssueNumber === 25 ? (
                             <button
-                              onClick={() => {
-                                const alreadyArchived = archivedStories.some(s => s.id === activeStories[0].id);
-                                if (!alreadyArchived) {
-                                  setArchivedStories([...activeStories, ...archivedStories]);
-                                }
-                                setActiveStories(NEXT_ISSUE_STORIES);
-                                setCurrentIssueNumber(43);
-                                triggerToast('✨ 策展發行成功：第 042 期專題已順利自動移至 [Archive 存檔]。發行全新第 043 期！');
-                              }}
-                              className="w-full bg-[#5A6351] hover:bg-[#4E5646] text-white font-sans-ui text-xs font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition-all cursor-pointer text-center flex items-center justify-center space-x-1.5 whitespace-nowrap"
+                              onClick={handleGenerateNextIssue}
+                              disabled={isGenerating}
+                              className={`w-full text-white font-sans-ui text-xs font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition-all text-center flex items-center justify-center space-x-1.5 whitespace-nowrap ${
+                                isGenerating 
+                                  ? 'bg-[#5A6351]/50 cursor-not-allowed' 
+                                  : 'bg-[#5A6351] hover:bg-[#4E5646] cursor-pointer'
+                              }`}
                             >
-                              <Sparkles className="w-4 h-4 text-white" />
-                              <span>發布 ISSUE 043 全新期刊</span>
+                              <Sparkles className={`w-4 h-4 text-white ${isGenerating ? 'animate-spin' : ''}`} />
+                              <span>{isGenerating ? '正在聯網搜尋與 AI 寫作中...' : '發布 ISSUE 026 全新期刊'}</span>
                             </button>
                           ) : (
                             <button
                               onClick={() => {
                                 setActiveStories(STORIES);
                                 setArchivedStories(HISTORICAL_STORIES);
-                                setCurrentIssueNumber(42);
-                                triggerToast('🔄 系統已回復至初始 ISSUE 042 期設定，Archive 已重置。');
+                                setCurrentIssueNumber(25);
+                                triggerToast('🔄 系統已回復至初始 ISSUE 025 期設定，Archive 已重置。');
                               }}
                               className="w-full bg-[#2C2C2A] hover:bg-[#3D3D3A] text-white font-sans-ui text-xs font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition-all cursor-pointer text-center whitespace-nowrap"
                             >
-                              <span>回復第 042 期封面（重置狀態）</span>
+                              <span>回復第 025 期封面（重置狀態）</span>
                             </button>
                           )}
                         </div>
@@ -1054,13 +1307,13 @@ export default function App() {
                           const defaultStoryClicks: {[key: string]: number} = {};
                           const allS = [...activeStories, ...archivedStories, ...NEXT_ISSUE_STORIES];
                           allS.forEach(s => {
-                            defaultStoryClicks[s.id] = s.id === 'ritual' ? 24 : s.id === 'oasis-cup' ? 18 : 12;
+                            defaultStoryClicks[s.id] = 0;
                           });
                           setStoryClicks(defaultStoryClicks);
 
                           const defaultProdClicks: {[key: string]: number} = {};
                           PRODUCTS.forEach(p => {
-                            defaultProdClicks[p.id] = 8;
+                            defaultProdClicks[p.id] = 0;
                           });
                           setProductClicks(defaultProdClicks);
                           triggerToast('🔄 智理統計數據已成功重置為預設初始值。');

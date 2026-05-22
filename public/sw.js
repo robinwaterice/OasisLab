@@ -31,6 +31,16 @@ self.addEventListener('fetch', (event) => {
   // Only handle standard http/https schemes
   if (!event.request.url.startsWith('http')) return;
 
+  // Bypass cache entirely in local development
+  if (
+    self.location.hostname === 'localhost' || 
+    self.location.hostname === '127.0.0.1' || 
+    self.location.port === '3000'
+  ) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {

@@ -21,7 +21,7 @@ export const STORIES: Story[] = [
     coverImage: 'https://images.unsplash.com/photo-1585776245991-cf89dd7fc73a?auto=format&fit=crop&w=1200&q=80',
     author: '編輯部・Eli Lin',
     readTime: '4 Mins Read',
-    date: 'ISSUE 042 // MAY 2026'
+    date: 'ISSUE 025 // MAY 2026'
   },
   {
     id: 'story-02',
@@ -35,10 +35,10 @@ export const STORIES: Story[] = [
 
 這些並非無謂的消費，而是在高壓現實中，奪回生活微小控制權的「必要儀式」。用極簡的設計與人體工學，向不妥協的靈魂致敬。`,
     targetTag: '辦公室必備',
-    coverImage: 'https://images.unsplash.com/photo-1517256064527-09c53b2d0bc6?auto=format&fit=crop&w=1200&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?auto=format&fit=crop&w=1200&q=80',
     author: '策展人・Siri Chen',
     readTime: '5 Mins Read',
-    date: 'ISSUE 042 // MAY 2026'
+    date: 'ISSUE 025 // MAY 2026'
   },
   {
     id: 'story-03',
@@ -55,7 +55,7 @@ export const STORIES: Story[] = [
     coverImage: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=1200&q=80',
     author: '資深旅人・Homer Chang',
     readTime: '3 Mins Read',
-    date: 'ISSUE 042 // MAY 2026'
+    date: 'ISSUE 025 // MAY 2026'
   }
 ];
 
@@ -75,7 +75,7 @@ export const HISTORICAL_STORIES: Story[] = [
     coverImage: 'https://images.unsplash.com/photo-1485955900006-10f4d324d411?auto=format&fit=crop&w=1200&q=80',
     author: '植物引路人・Yara Lin',
     readTime: '5 Mins Read',
-    date: 'ISSUE 041 // APR 2026'
+    date: 'ISSUE 024 // APR 2026'
   },
   {
     id: 'story-h02',
@@ -89,10 +89,10 @@ export const HISTORICAL_STORIES: Story[] = [
 
 用天然物件的舊化（Aging），來對抗都市生活的折舊與磨損。這正是我們極力推薦的永續選物哲学。`,
     targetTag: '極簡旅行',
-    coverImage: 'https://images.unsplash.com/photo-1530521951575-7bb863977288?auto=format&fit=crop&w=1200&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1531346878377-a5be20888e57?auto=format&fit=crop&w=1200&q=80',
     author: '工藝主編・Mao Wu',
     readTime: '3 Mins Read',
-    date: 'ISSUE 041 // APR 2026'
+    date: 'ISSUE 024 // APR 2026'
   },
   {
     id: 'story-h03',
@@ -109,7 +109,7 @@ export const HISTORICAL_STORIES: Story[] = [
     coverImage: 'https://images.unsplash.com/photo-1545048702-79362596cdc9?auto=format&fit=crop&w=1200&q=80',
     author: '茶人・Ryu Shen',
     readTime: '4 Mins Read',
-    date: 'ISSUE 040 // MAR 2026'
+    date: 'ISSUE 023 // MAR 2026'
   }
 ];
 
@@ -129,7 +129,7 @@ export const NEXT_ISSUE_STORIES: Story[] = [
     coverImage: 'https://images.unsplash.com/photo-1501555088652-021faa106b9b?auto=format&fit=crop&w=1200&q=80',
     author: '徒步評論家・Kary Tseng',
     readTime: '4 Mins Read',
-    date: 'ISSUE 043 // JUN 2026'
+    date: 'ISSUE 026 // JUN 2026'
   },
   {
     id: 'story-n02',
@@ -146,7 +146,7 @@ export const NEXT_ISSUE_STORIES: Story[] = [
     coverImage: 'https://images.unsplash.com/photo-1595515106969-1ce29566ff1c?auto=format&fit=crop&w=1200&q=80',
     author: '人體工學主筆・Alan Ko',
     readTime: '3 Mins Read',
-    date: 'ISSUE 043 // JUN 2026'
+    date: 'ISSUE 026 // JUN 2026'
   },
   {
     id: 'story-n03',
@@ -163,7 +163,7 @@ export const NEXT_ISSUE_STORIES: Story[] = [
     coverImage: 'https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=1200&q=80',
     author: '香氛調香師・Joanna Xu',
     readTime: '5 Mins Read',
-    date: 'ISSUE 043 // JUN 2026'
+    date: 'ISSUE 026 // JUN 2026'
   }
 ];
 
@@ -176,7 +176,7 @@ export const PRODUCTS: Product[] = [
     btn_text: '探索生活靈感',
     context_tags: ['日常充電', '辦公室必備'],
     status: 'active',
-    image_url: 'https://images.unsplash.com/photo-1622445262465-248195766433?auto=format&fit=crop&w=600&q=80',
+    image_url: 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=600&q=80',
     description: '懸浮磁吸設計，告別凌亂線材，為 iPhone、Apple Watch 與 AirPods 同時注入飽滿的桌面能量。'
   },
   {
