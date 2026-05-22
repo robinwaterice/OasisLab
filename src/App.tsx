@@ -50,6 +50,32 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [generationStep, setGenerationStep] = useState<string>('idle');
 
+  // 策展指定關鍵字狀態
+  const [showKeywordModal, setShowKeywordModal] = useState<boolean>(false);
+  const [nomadKeyword, setNomadKeyword] = useState<string>('');
+  const [officeKeyword, setOfficeKeyword] = useState<string>('');
+  const [minimalistTravelKeyword, setMinimalistTravelKeyword] = useState<string>('');
+
+  // 重置期數與編輯選取專題狀態
+  const [rollbackIssueNum, setRollbackIssueNum] = useState<number>(25);
+  const [selectedEditStoryId, setSelectedEditStoryId] = useState<string>('');
+  const [editTitle, setEditTitle] = useState<string>('');
+  const [editDescription, setEditDescription] = useState<string>('');
+  const [editContent, setEditContent] = useState<string>('');
+
+  // 依期數動態計算月份與年度，May 2026 為第 25 期基底
+  const getIssueDate = (issueNum: number) => {
+    const baseIssue = 25;
+    const baseYear = 2026;
+    const baseMonthIndex = 4; // MAY
+    const totalMonths = baseMonthIndex + (issueNum - baseIssue);
+    const year = baseYear + Math.floor(totalMonths / 12);
+    const monthIndex = ((totalMonths % 12) + 12) % 12;
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    const padNum = String(issueNum).padStart(3, '0');
+    return `ISSUE ${padNum} // ${months[monthIndex]} ${year}`;
+  };
+
   // 隨機偏移量（使顯示點擊數穩定且隨機，不會隨畫面重繪而頻繁亂跳）
   const [storyOffsets, setStoryOffsets] = useState<{[key: string]: number}>(() => {
     const offsets: {[key: string]: number} = {};
@@ -190,36 +216,14 @@ export default function App() {
     );
   };
 
-  // 收藏/儲存商品功能的切換 (Local UI helper)
-  const toggleSaveProduct = (prodId: string) => {
-    if (savedProducts.includes(prodId)) {
-      setSavedProducts(savedProducts.filter(id => id !== prodId));
-    } else {
-      setSavedProducts([...savedProducts, prodId]);
-    }
-  };
-
-  // 分享功能（複製專屬連結）
-  const handleShareStory = (storyTitle: string) => {
-    navigator.clipboard.writeText(`${window.location.href}#${storyTitle}`);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 3000);
-  };
-
-  // 點擊前往聯盟行銷連結的動態處理
-  const handleProductRedirect = (product: Product) => {
-    setProductClicks(prev => ({
-      ...prev,
-      [product.id]: (prev[product.id] || 0) + 1
-    }));
-    setActiveReferral(product);
-  };
-
   // 聯網搜尋趨勢與動態 AI 策展下一期專題
-  const handleGenerateNextIssue = async () => {
+  const handleGenerateNextIssue = async (keywords?: { nomad?: string; office?: string; minimalistTravel?: string }) => {
     setIsGenerating(true);
     setGenerationStep('searching');
     
+    const nextIssueNum = currentIssueNumber + 1;
+    const nextIssueDate = getIssueDate(nextIssueNum);
+
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       if (!apiKey || apiKey.trim() === '' || apiKey.startsWith('nvapi-')) {
@@ -231,9 +235,9 @@ export default function App() {
 
       const systemInstructions = `你是一位享譽國際的極簡生活美學雜誌《Oasis Lab.》的總編輯。
 你對現代都市人的生活方式有著深刻的理解，文筆溫潤、優雅、富有哲思與詩意。
-你的任務是為最新一期雜誌《ISSUE 026 // JUN 2026》策劃、撰寫三篇高質感的原創專題文章。
+你的任務是為最新一期雜誌《${nextIssueDate}》策劃、撰寫三篇高質感的原創專題文章。
 
-請務必在生成前使用 Google Search 工具搜尋 2026/2027 最新最受歡迎的數位游牧工具、辦公美學配置、極簡主義產品與旅行新趨勢，並在文章中融入 these 具體的實時資訊。
+請務必在生成前使用 Google Search 工具搜尋最新最受歡迎的數位游牧工具、辦公美學配置、極簡主義產品與旅行新趨勢，並在文章中融入這些具體的實時資訊。
 
 這三篇文章必須分別對應以下四個主題中的【三個不同主題】（即每篇文章的主題分類不同）：
 1. 游牧數位 (Digital Nomad) - 對應的 targetTag 為 '日常充電'，Emoji 可選 '💻' 或 '🔋'。
@@ -241,9 +245,10 @@ export default function App() {
 3. 極簡美學 (Minimalist Aesthetics) - 對應的 targetTag 為 '日常充電' 或 '辦公室必備'，Emoji 可選 '🌿' 或 '🕯️'。
 4. 旅行 (Travel) - 對應的 targetTag 為 '極簡旅行'，Emoji 可選 '✈️' 或 '🏕️'。
 
-【寫作指導風格】：
+【寫作指導風格與要求】：
 - 文字風格必須是散發文藝氣息的繁體中文，行文高雅精緻，段落分明，富有生活儀式感。
 - 每篇文章的 'content' 欄位必須是長篇深度文章（至少 3-4 個段落），不要有任何 markdown 代碼標記（如 \`\`\` 等），使用換行符 (\\n) 分割段落。
+- **【標題極簡與多樣化要求】**：在撰寫文章標題 ("title") 時，**請絕對不要包含任何年份或數字（例如 2025、2026、2027、今年、新的一年等）**。請保持標題的多樣性與文學美感，以抽象、溫潤、富有生活哲思的方式命名（例如《專注的儀式》、《日常的留白》、《流動的精神聖殿》等），嚴禁千篇一律地使用帶年份的格式。
 
 【封面圖配對】：
 請為每篇文章的 'coverImage' 欄位，從以下為您精心整理的視覺美學清單中，挑選最符合該主題的一張【完整 URL】：
@@ -280,11 +285,27 @@ export default function App() {
   "coverImage": "從上方清單挑選的最佳 Unsplash URL",
   "author": "編輯姓名，如 '主編・Elian'",
   "readTime": "閱讀時間，如 '4 Mins Read'",
-  "date": "必須為 'ISSUE 026 // JUN 2026'"
+  "date": "必須為 '${nextIssueDate}'"
 }
 請勿輸出任何 Schema 定義本身、任何額外的 Markdown 代碼解釋或問候，只需輸出包裹在 \`\`\`json 內的故事 JSON 陣列即可。`;
 
-      const userPrompt = `為最新期 ISSUE 026 雜誌生成 3 篇具備實時 Google 搜尋趨勢的精緻專題文章。請徹底搜尋並融入 2026-2027 最熱門的數位游牧、辦公美學配置、極簡生活與旅行新趨勢，並以 JSON 陣列輸出符合系統架構的故事。`;
+      const existingTitles = [...activeStories, ...archivedStories].map(s => s.title).join('、');
+      
+      let keywordInstructions = "";
+      if (keywords) {
+        const parts = [];
+        if (keywords.nomad) parts.push(`- 游牧數位 (Digital Nomad) 專題必須圍繞指定關鍵字「${keywords.nomad}」展開深入寫作與選物美學。`);
+        if (keywords.office) parts.push(`- 辦公美學 (Office Aesthetics) 專題必須圍繞指定關鍵字「${keywords.office}」展開人體工學與配置探討。`);
+        if (keywords.minimalistTravel) parts.push(`- 極簡美學與旅行 (Minimalist & Travel) 專題必須圍繞指定關鍵字「${keywords.minimalistTravel}」展開收納與輕量化生活哲學。`);
+        
+        if (parts.length > 0) {
+          keywordInstructions = `\n\n【策展人指定關鍵字寫作要求】：\n本期專題文章已由策展人特別指定了核心方向，請務必圍繞以下關鍵字進行深度創作：\n${parts.join('\n')}\n請在產出的文章標題 (title) 與內文 (content) 中自然、溫潤且優雅地融入上述指定關鍵字與主題概念，並以此關鍵字為核心進行專題寫作。`;
+        }
+      }
+
+      const userPrompt = `為最新期 ISSUE ${String(nextIssueNum).padStart(3, '0')} 雜誌生成 3 篇具備實時 Google 搜尋趨勢的精緻專題文章。請徹底搜尋並融入最新最熱門的數位游牧、辦公美學配置、極簡生活與旅行新趨勢，並以 JSON 陣列輸出符合系統架構的故事。${keywordInstructions}
+【避免重複提示】：
+為了維護期刊內容的獨特創想與新鮮感，請絕對不要重複或模仿以下已發布過的文章標題與核心概念：${existingTitles}。請為這一期量身定制三篇主題全新、觀點新穎的文章。標題絕對不可出現任何年份。`;
 
       const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
@@ -353,57 +374,137 @@ export default function App() {
         throw new Error('Curated stories array format is incorrect or incomplete.');
       }
 
-      // 歷史期刊存檔輪轉
+      // 將生成的故事 ID 附帶期刊號進行唯一化，避免 key 重複衝突
+      const uniqueParsedStories = parsedStories.map((story, index) => {
+        const safeIndex = index + 1;
+        return {
+          ...story,
+          id: `story-i${nextIssueNum}-0${safeIndex}`,
+          subtitle: `STORY 0${safeIndex} // ${story.subtitle.split('//')[1]?.trim() || '新期刊專題'}`,
+          date: nextIssueDate
+        };
+      });
+
+      // 歷史期刊存檔輪轉（將原本的 activeStories 移存至 ArchivedStories 存盤）
       setArchivedStories(prev => {
-        if (prev.some(s => s.id === activeStories[0].id)) {
-          return prev;
-        }
         const merged = [...activeStories, ...prev];
         return Array.from(new Map(merged.map(s => [s.id, s])).values());
       });
-      setActiveStories(parsedStories);
+
+      setActiveStories(uniqueParsedStories);
       setStoryOffsets(prev => {
         const nextOffsets = { ...prev };
-        parsedStories.forEach(s => {
+        uniqueParsedStories.forEach(s => {
           if (!nextOffsets[s.id]) {
             nextOffsets[s.id] = Math.floor(Math.random() * 1200) + 800;
           }
         });
         return nextOffsets;
       });
-      setCurrentIssueNumber(26);
-      triggerToast('✨ 聯網搜尋與 AI 寫作成功！已為您發行全新第 026 期高質感專題期刊！');
+      
+      setCurrentIssueNumber(nextIssueNum);
+      triggerToast(`✨ 聯網搜尋與 AI 寫作成功！已為您發行全新第 ${String(nextIssueNum).padStart(3, '0')} 期高質感專題期刊！`);
 
     } catch (error: any) {
       console.error('AI Journal Curation Error:', error);
       
-      // 降級容錯處理
+      // 降級與發行回滾處理
       await new Promise(resolve => setTimeout(resolve, 1200));
-      setArchivedStories(prev => {
-        if (prev.some(s => s.id === activeStories[0].id)) {
-          return prev;
-        }
-        const merged = [...activeStories, ...prev];
-        return Array.from(new Map(merged.map(s => [s.id, s])).values());
-      });
-      setActiveStories(NEXT_ISSUE_STORIES);
-      setStoryOffsets(prev => {
-        const nextOffsets = { ...prev };
-        NEXT_ISSUE_STORIES.forEach(s => {
-          if (!nextOffsets[s.id]) {
-            nextOffsets[s.id] = Math.floor(Math.random() * 1200) + 800;
-          }
-        });
-        return nextOffsets;
-      });
-      setCurrentIssueNumber(26);
-      
-      triggerToast(`⚠️ 聯網搜尋呼叫失敗（${error.message || '網路異常'}），已安全降級加載內置預置 026 期美學專題。`);
+      // 當生成失敗時，我們保持在原本的期數與故事狀態，並回報錯誤
+      triggerToast(`⚠️ 聯網搜尋與 AI 寫作失敗（${error.message || '網路異常'}），已維持在當前第 ${String(currentIssueNumber).padStart(3, '0')} 期設定。`);
     } finally {
       setIsGenerating(false);
       setGenerationStep('idle');
     }
   };
+
+  // 獲取專題對應期數的輔助函數
+  const getStoryIssueNumber = (story: Story): number => {
+    if (story.id.startsWith('story-i')) {
+      const match = story.id.match(/^story-i(\d+)-/);
+      if (match) return parseInt(match[1], 10);
+    }
+    // 預設 initial stories 是第 25 期
+    if (story.id === 'story-01' || story.id === 'story-02' || story.id === 'story-03') {
+      return 25;
+    }
+    // 預設 NEXT_ISSUE_STORIES 的備份
+    if (story.id === 'story-n01' || story.id === 'story-n02' || story.id === 'story-n03') {
+      return 26;
+    }
+    // 其他歸檔處理
+    if (story.date?.includes('ISSUE 024')) return 24;
+    if (story.date?.includes('ISSUE 023')) return 23;
+    return 25;
+  };
+
+  // 執行重置回指定期數的動作
+  const handleRollbackToIssue = (targetIssue: number) => {
+    if (targetIssue === 25) {
+      setActiveStories(STORIES);
+      setArchivedStories(HISTORICAL_STORIES);
+      setCurrentIssueNumber(25);
+      setRollbackIssueNum(25);
+      triggerToast('🔄 系統已回復至初始 ISSUE 025 期設定，Archive 已重置。');
+    } else {
+      const allPossibleStories = [...activeStories, ...archivedStories, ...NEXT_ISSUE_STORIES];
+      const targetStories = allPossibleStories.filter(s => getStoryIssueNumber(s) === targetIssue);
+
+      if (targetStories.length > 0) {
+        // 僅保留早於 targetIssue 的歸檔專題
+        const earlierStories = archivedStories.filter(s => getStoryIssueNumber(s) < targetIssue);
+        
+        setActiveStories(targetStories);
+        setArchivedStories(earlierStories);
+        setCurrentIssueNumber(targetIssue);
+        setRollbackIssueNum(targetIssue);
+        triggerToast(`🔄 系統已成功重置回第 ${String(targetIssue).padStart(3, '0')} 期專題狀態！`);
+      } else {
+        triggerToast(`⚠️ 找不到第 ${String(targetIssue).padStart(3, '0')} 期的專題存檔。`);
+      }
+    }
+  };
+
+  // 儲存並發布後台修改的專題文字
+  const handleSaveStoryEdits = () => {
+    setActiveStories(prev => prev.map(s => {
+      if (s.id === selectedEditStoryId) {
+        return {
+          ...s,
+          title: editTitle,
+          description: editDescription,
+          content: editContent
+        };
+      }
+      return s;
+    }));
+    triggerToast(`✨ 已成功更新專題《${editTitle}》的文字內容，並即時發布至前台！`);
+  };
+
+  // 設定編輯器預設選取的專題
+  useEffect(() => {
+    if (activeStories.length > 0) {
+      const exists = activeStories.some(s => s.id === selectedEditStoryId);
+      if (!exists) {
+        setSelectedEditStoryId(activeStories[0].id);
+      }
+    }
+  }, [activeStories, selectedEditStoryId]);
+
+  // 當所選專題或 activeStories 改變時，同步載入內容至暫存狀態
+  useEffect(() => {
+    const story = activeStories.find(s => s.id === selectedEditStoryId);
+    if (story) {
+      setEditTitle(story.title);
+      setEditDescription(story.description);
+      setEditContent(story.content);
+    }
+  }, [selectedEditStoryId, activeStories]);
+
+  // 當 currentIssueNumber 改變時，自動將 rollbackIssueNum 設為當前最新期數
+  useEffect(() => {
+    setRollbackIssueNum(currentIssueNumber);
+  }, [currentIssueNumber]);
 
   return (
     <div id="oasis-root" className="min-h-screen bg-[#F4F4F3] text-[#2C2C2A] selection:bg-[#5A6351]/20 selection:text-[#5A6351] font-serif overflow-x-hidden relative">
@@ -688,7 +789,7 @@ export default function App() {
               <div className="mb-24 h-auto">
                 <div className="flex items-center justify-between mb-8 pb-3 border-b border-[#2C2C2A]/10">
                   <span className="font-mono-data text-xs tracking-widest text-[#2C2C2A]/60 font-bold uppercase">
-                    FEATURED STORIES // 精選專題 (ISSUE 0{currentIssueNumber})
+                    FEATURED STORIES // 精選專題 (ISSUE {String(currentIssueNumber).padStart(3, '0')})
                   </span>
                   <span className="font-sans-ui text-xs text-[#5A6351]">
                      點擊或懸停探索
@@ -1249,50 +1350,181 @@ export default function App() {
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 my-6">
-                      <div className="bg-[#F4F4F3] border border-[#2C2C2A]/5 p-6 rounded-xl space-y-3">
-                        <h4 className="font-serif font-bold text-sm text-[#2C2C2A]">發行模擬說明</h4>
-                        <ul className="list-disc pl-4 space-y-2 text-xs text-[#2C2C2A]/60 font-sans-ui mb-2">
-                          <li>一鍵「推出下一期刊物 (ISSUE 026)」後，系統數據會全線更新。</li>
-                          <li>當前首頁的三大主題：《專注的儀式》、《隨身的微型綠洲》、《極簡主義行囊》將會自動移入「歷史期刊 (Archive)」存盤。</li>
-                          <li>系統首頁封面會煥然一新，加載全新第 026 期的一組精選靈感。</li>
-                        </ul>
-                      </div>
-
-                      <div className="flex flex-col justify-center items-center p-6 bg-[#5A6351]/5 border border-[#5A6351]/10 rounded-xl text-center">
-                        <p className="font-mono-data text-xs text-[#5A6351] font-bold tracking-widest mb-2 uppercase font-semibold">ACTION CENTER // 策展動作</p>
-                        <p className="text-xs text-[#2C2C2A]/60 mb-6 font-sans-ui">當前發行狀態：{currentIssueNumber === 25 ? "待發行新期刊" : "已發布 026 特刊"}</p>
-                        
-                        <div className="w-full max-w-xs space-y-3">
-                          {currentIssueNumber === 25 ? (
-                            <button
-                              onClick={handleGenerateNextIssue}
-                              disabled={isGenerating}
-                              className={`w-full text-white font-sans-ui text-xs font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition-all text-center flex items-center justify-center space-x-1.5 whitespace-nowrap ${
-                                isGenerating 
-                                  ? 'bg-[#5A6351]/50 cursor-not-allowed' 
-                                  : 'bg-[#5A6351] hover:bg-[#4E5646] cursor-pointer'
-                              }`}
-                            >
-                              <Sparkles className={`w-4 h-4 text-white ${isGenerating ? 'animate-spin' : ''}`} />
-                              <span>{isGenerating ? '正在聯網搜尋與 AI 寫作中...' : '發布 ISSUE 026 全新期刊'}</span>
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                setActiveStories(STORIES);
-                                setArchivedStories(HISTORICAL_STORIES);
-                                setCurrentIssueNumber(25);
-                                triggerToast('🔄 系統已回復至初始 ISSUE 025 期設定，Archive 已重置。');
-                              }}
-                              className="w-full bg-[#2C2C2A] hover:bg-[#3D3D3A] text-white font-sans-ui text-xs font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition-all cursor-pointer text-center whitespace-nowrap"
-                            >
-                              <span>回復第 025 期封面（重置狀態）</span>
-                            </button>
-                          )}
+                    {/* 發行模擬說明 */}
+                    <div className="bg-[#F4F4F3] border border-[#2C2C2A]/5 p-6 rounded-xl space-y-3 mb-6">
+                      <h4 className="font-serif font-bold text-sm text-[#2C2C2A]">發行模擬說明與狀態</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-xs text-[#2C2C2A]/60 font-sans-ui">
+                        <div className="space-y-1 sm:col-span-2">
+                          <p className="flex items-center space-x-1.5 text-xs text-[#2C2C2A]/70 font-semibold mb-1">
+                            <span>💡 如何模擬真實發行：</span>
+                          </p>
+                          <ul className="list-disc pl-4 space-y-1">
+                            <li>點擊發布新期刊後，當前專題內容會移存至「歷史期刊 (Archive)」歸檔。</li>
+                            <li>AI 會自動搜尋最新美學產品與旅行趨勢，為您撰寫發布下一期新專題。</li>
+                            <li>重置功能可以讓您隨時一鍵回復至初始 ISSUE 025 狀態。</li>
+                          </ul>
+                        </div>
+                        <div className="flex flex-col justify-center items-center p-4 bg-white/60 border border-[#2C2C2A]/5 rounded-lg text-center">
+                          <span className="font-mono-data text-[10px] text-[#2C2C2A]/40 font-bold uppercase tracking-wider block mb-1">CURRENT STATUS // 發行狀態</span>
+                          <span className="font-mono-data text-xs text-[#5A6351] font-bold">
+                            {currentIssueNumber === 25 ? "待發行新期刊" : `已發布 ISSUE ${String(currentIssueNumber).padStart(3, '0')} 新期刊`}
+                          </span>
                         </div>
                       </div>
                     </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-6">
+                      {/* 動作一：AI 策展發布 */}
+                      <div className="flex flex-col justify-between p-6 bg-[#5A6351]/5 border border-[#5A6351]/10 rounded-xl">
+                        <div>
+                          <span className="font-mono-data text-[10px] text-[#5A6351] font-bold tracking-widest block uppercase mb-1">DECISION A // AI 策展發布</span>
+                          <h4 className="font-serif font-bold text-sm text-[#2C2C2A] mb-2">發布下一期全新期刊</h4>
+                          <p className="text-xs text-[#2C2C2A]/50 font-sans-ui leading-relaxed mb-6">
+                            聯網搜尋最新趨勢，調配極簡美學語調與選物關聯，發布第 {String(currentIssueNumber + 1).padStart(3, '0')} 期文章。
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setNomadKeyword('');
+                            setOfficeKeyword('');
+                            setMinimalistTravelKeyword('');
+                            setShowKeywordModal(true);
+                          }}
+                          disabled={isGenerating}
+                          className={`w-full text-white font-sans-ui text-xs font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition-all text-center flex items-center justify-center space-x-1.5 whitespace-nowrap ${
+                            isGenerating 
+                              ? 'bg-[#5A6351]/50 cursor-not-allowed' 
+                              : 'bg-[#5A6351] hover:bg-[#4E5646] cursor-pointer'
+                          }`}
+                        >
+                          <Sparkles className={`w-4 h-4 text-white ${isGenerating ? 'animate-spin' : ''}`} />
+                          <span>{isGenerating ? '正在聯網搜尋與 AI 寫作中...' : `發布 ISSUE ${String(currentIssueNumber + 1).padStart(3, '0')} 全新期刊`}</span>
+                        </button>
+                      </div>
+
+                      {/* 動作二：系統狀態重置 */}
+                      <div className="flex flex-col justify-between p-6 bg-[#2C2C2A]/5 border border-[#2C2C2A]/10 rounded-xl">
+                        <div>
+                          <span className="font-mono-data text-[10px] text-[#2C2C2A]/50 font-bold tracking-widest block uppercase mb-1">DECISION B // 系統狀態重置</span>
+                          <h4 className="font-serif font-bold text-sm text-[#2C2C2A] mb-2">回復指定期刊設定</h4>
+                          <p className="text-xs text-[#2C2C2A]/50 font-sans-ui leading-relaxed mb-6">
+                            選擇將整個期刊系統與文章配置完美重置回指定的歷史期數狀態，小於所選期數的歷史封存將被保留，大於等於的將被清除。
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-3.5">
+                          <div className="flex items-center space-x-2 bg-white/50 border border-[#2C2C2A]/15 rounded-lg px-3 py-2">
+                            <span className="font-sans-ui text-xs text-[#2C2C2A]/60 shrink-0">重置至：</span>
+                            <select
+                              value={rollbackIssueNum}
+                              onChange={(e) => setRollbackIssueNum(parseInt(e.target.value, 10))}
+                              className="flex-1 bg-transparent text-[#2C2C2A] text-xs font-sans-ui font-semibold focus:outline-none cursor-pointer"
+                            >
+                              {(() => {
+                                const options = [];
+                                for (let i = 25; i <= currentIssueNumber; i++) {
+                                  options.push(
+                                    <option key={i} value={i} className="text-[#2C2C2A]">
+                                      第 {i} 期 (ISSUE {String(i).padStart(3, '0')})
+                                    </option>
+                                  );
+                                }
+                                return options;
+                              })()}
+                            </select>
+                          </div>
+                          
+                          <button
+                            onClick={() => handleRollbackToIssue(rollbackIssueNum)}
+                            className="w-full bg-[#2C2C2A] hover:bg-[#3D3D3A] text-white font-sans-ui text-xs font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition-all text-center cursor-pointer whitespace-nowrap"
+                          >
+                            <span>確認重置至指定期刊</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 專題文字編輯器智理台 */}
+                  <div className="bg-white border border-[#2C2C2A]/10 rounded-2xl p-8 shadow-[0_12px_45px_rgba(90,99,81,0.03)] transition-all duration-300">
+                    <div className="flex items-center space-x-3 text-[#2C2C2A] pb-4 border-b border-[#2C2C2A]/5 mb-6">
+                      <Feather className="w-5 h-5 text-[#5A6351]" />
+                      <span className="font-mono-data text-xs tracking-widest font-bold uppercase text-[#5A6351]">EDITORIAL DESK // 專題文字編輯室</span>
+                    </div>
+
+                    <p className="font-sans-ui text-xs text-[#2C2C2A]/60 leading-relaxed mb-6">
+                      在此您可以直接編輯當前第 <strong>{String(currentIssueNumber).padStart(3, '0')}</strong> 期的三篇 Active 精選專題內容。選擇下方的分頁標籤即可切換，修改後點擊儲存，前台以及深度詳細頁的文字即會即時更新。
+                    </p>
+
+                    {/* 專題 Tabs 切換標籤 */}
+                    <div className="flex flex-col sm:flex-row gap-2 mb-6">
+                      {activeStories.map((story, index) => {
+                        const isSelected = story.id === selectedEditStoryId;
+                        return (
+                          <button
+                            key={story.id}
+                            type="button"
+                            onClick={() => setSelectedEditStoryId(story.id)}
+                            className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2.5 rounded-lg text-xs font-sans-ui font-bold border transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-[#5A6351] text-[#F4F4F3] border-[#5A6351] shadow-sm'
+                                : 'bg-[#F4F4F3]/50 text-[#2C2C2A]/70 hover:bg-[#2C2C2A]/5 border-[#2C2C2A]/10'
+                            }`}
+                          >
+                            <span>{story.icon}</span>
+                            <span className="truncate max-w-[120px]">{story.title || `專題 0${index + 1}`}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* 編輯表單內容 */}
+                    {activeStories.find(s => s.id === selectedEditStoryId) && (
+                      <div className="space-y-5 font-sans-ui text-xs text-[#2C2C2A]/80">
+                        <div>
+                          <label className="block text-xs font-mono-data text-[#2C2C2A]/60 uppercase tracking-wider mb-2">專題標題 (Title)</label>
+                          <input
+                            type="text"
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            placeholder="請輸入專題標題"
+                            className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-serif font-bold text-sm transition-all"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-mono-data text-[#2C2C2A]/60 uppercase tracking-wider mb-2">專題引言 / 摘要 (Description)</label>
+                          <textarea
+                            rows={3}
+                            value={editDescription}
+                            onChange={(e) => setEditDescription(e.target.value)}
+                            placeholder="請輸入 1-2 句吸引讀者的引言"
+                            className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui leading-relaxed transition-all resize-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-mono-data text-[#2C2C2A]/60 uppercase tracking-wider mb-2">深度專題內文 (Content)</label>
+                          <textarea
+                            rows={10}
+                            value={editContent}
+                            onChange={(e) => setEditContent(e.target.value)}
+                            placeholder="請輸入深度內文，段落間請以兩次換行隔開"
+                            className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-serif leading-loose text-justify transition-all"
+                          />
+                        </div>
+
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            onClick={handleSaveStoryEdits}
+                            className="w-full bg-[#5A6351] hover:bg-[#4E5646] text-white font-sans-ui text-xs font-bold py-3 px-4 rounded-lg cursor-pointer transition-all flex items-center justify-center space-x-2 shadow-md hover:shadow-lg"
+                          >
+                            <CheckCircle2 className="w-4 h-4 text-white" />
+                            <span>儲存並發布此專題變更</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* 實際數字與 點擊率 統計智理台 */}
@@ -1778,6 +2010,112 @@ export default function App() {
               >
                 好的，我已瞭解
               </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 策展關鍵字設定氣泡彈窗 */}
+      <AnimatePresence>
+        {showKeywordModal && (
+          <motion.div
+            id="keyword-modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2C2C2A]/60 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="bg-[#F4F4F3] border border-[#2C2C2A]/15 rounded-2xl p-6 md:p-8 max-w-md w-full shadow-2xl font-serif text-[#2C2C2A]"
+            >
+              <div className="flex justify-between items-start mb-6">
+                <div className="flex space-x-2 items-center text-[#5A6351]">
+                  <Sparkles className="w-5 h-5 animate-pulse" />
+                  <span className="font-sans-ui text-xs tracking-widest font-bold uppercase">AI Topic Customization</span>
+                </div>
+                <button
+                  onClick={() => setShowKeywordModal(false)}
+                  className="p-1 rounded-full hover:bg-[#2C2C2A]/5 transition-colors text-[#2C2C2A]/60 hover:text-[#2C2C2A] cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <h3 className="text-xl font-bold mb-2 tracking-tight">自訂最新一期專題關鍵字</h3>
+              <p className="font-sans-ui text-xs text-[#2C2C2A]/60 mb-6 leading-relaxed">
+                您可以為下一期 (ISSUE {String(currentIssueNumber + 1).padStart(3, '0')}) 的三個主題指定專題關鍵字。AI 將依您填寫的關鍵字為核心進行深度策展與寫作；若留白，則依預設美學自由生成。
+              </p>
+
+              <div className="space-y-4 font-sans-ui text-xs text-[#2C2C2A]/80 mb-6">
+                <div>
+                  <label className="block font-bold mb-1.5 text-[#2C2C2A]/70">
+                    💻 游牧數位 (Digital Nomad) 專題關鍵字
+                  </label>
+                  <input
+                    type="text"
+                    value={nomadKeyword}
+                    onChange={(e) => setNomadKeyword(e.target.value)}
+                    placeholder="例如：人體工學機械鍵盤、輕量降噪耳機（選填）"
+                    className="w-full bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3 py-2.5 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui placeholder:text-[#2C2C2A]/30 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold mb-1.5 text-[#2C2C2A]/70">
+                    ☕ 辦公美學 (Office Aesthetics) 專題關鍵字
+                  </label>
+                  <input
+                    type="text"
+                    value={officeKeyword}
+                    onChange={(e) => setOfficeKeyword(e.target.value)}
+                    placeholder="例如：原木升降桌、極簡手沖咖啡壺（選填）"
+                    className="w-full bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3 py-2.5 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui placeholder:text-[#2C2C2A]/30 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold mb-1.5 text-[#2C2C2A]/70">
+                    ✈️ 極簡旅行 (Minimalist Travel) 專題關鍵字
+                  </label>
+                  <input
+                    type="text"
+                    value={minimalistTravelKeyword}
+                    onChange={(e) => setMinimalistTravelKeyword(e.target.value)}
+                    placeholder="例如：耐磨防潑水雙肩包、超輕量盥洗包（選填）"
+                    className="w-full bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3 py-2.5 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui placeholder:text-[#2C2C2A]/30 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-[#5A6351]/5 border-l-2 border-[#5A6351] p-3 text-[11px] font-sans-ui text-[#5A6351]/90 rounded mb-6 leading-relaxed">
+                💡 填寫關鍵字可以精準引導 AI 創作出您喜愛的好物故事，為您客製專屬的生活美學提案。
+              </div>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowKeywordModal(false)}
+                  className="flex-1 border border-[#2C2C2A]/15 hover:bg-[#2C2C2A]/5 py-2.5 rounded-lg text-center font-sans-ui text-xs text-[#2C2C2A]/70 transition-colors cursor-pointer"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => {
+                    setShowKeywordModal(false);
+                    handleGenerateNextIssue({
+                      nomad: nomadKeyword,
+                      office: officeKeyword,
+                      minimalistTravel: minimalistTravelKeyword
+                    });
+                  }}
+                  className="flex-1 bg-[#5A6351] hover:bg-[#4E5646] text-[#F4F4F3] py-2.5 rounded-lg text-center font-sans-ui font-medium text-xs transition-colors cursor-pointer flex items-center justify-center space-x-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>開始 AI 策展生成</span>
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
