@@ -1,4 +1,4 @@
-const key = process.env.VITE_GEMINI_API_KEY || 'AIzaSyDUXEn0pq8fqWghEP1nze3pr8jnU9Pup0I';
+const key = process.env.VITE_GEMINI_API_KEY || 'AIzaSyAivCTZaBF8V8rmpVAbxCbS6YROCOXPskI';
 const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
 
 const requestBody = {
