@@ -275,6 +275,7 @@ export default function App() {
   // 內建自訂 3:2 裁切器狀態
   const [showCropModal, setShowCropModal] = useState<boolean>(false);
   const [cropSrc, setCropSrc] = useState<string>('');
+  const [cropTarget, setCropTarget] = useState<'story' | 'product'>('story');
   const [cropZoom, setCropZoom] = useState<number>(1.0);
   const [cropPanX, setCropPanX] = useState<number>(0);
   const [cropPanY, setCropPanY] = useState<number>(0);
@@ -506,53 +507,15 @@ export default function App() {
       return;
     }
 
-    triggerToast('⏳ 正在上傳並最佳化商品圖片...');
-
     const reader = new FileReader();
     reader.onload = (event) => {
       if (event.target?.result) {
-        const img = new Image();
-        img.src = event.target.result as string;
-        img.onload = () => {
-          // 為避免 LocalStorage 超出 5MB 限制，進行圖片壓縮與縮放至最高 600x600 尺寸
-          const canvas = document.createElement('canvas');
-          const maxDim = 600;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > maxDim || height > maxDim) {
-            if (width > height) {
-              height = Math.round((height * maxDim) / width);
-              width = maxDim;
-            } else {
-              width = Math.round((width * maxDim) / height);
-              height = maxDim;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            try {
-              // 壓縮為高品質 jpeg (0.8) 減少 byte 數
-              const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-              setEditProductImageUrl(compressedDataUrl);
-              triggerToast('✨ 商品圖片已成功上傳並最佳化！儲存商品後即可即時發布。');
-            } catch (err) {
-              // Fallback to original read if canvas fails
-              setEditProductImageUrl(event.target?.result as string);
-              triggerToast('✨ 商品圖片上傳成功！');
-            }
-          } else {
-            setEditProductImageUrl(event.target?.result as string);
-            triggerToast('✨ 商品圖片上傳成功！');
-          }
-        };
-        img.onerror = () => {
-          triggerToast('❌ 讀取圖片檔案失敗，請換一張試試。');
-        };
+        setCropTarget('product');
+        setCropSrc(event.target.result as string);
+        setCropZoom(1.0);
+        setCropPanX(0);
+        setCropPanY(0);
+        setShowCropModal(true);
       }
     };
     reader.readAsDataURL(file);
@@ -637,6 +600,24 @@ export default function App() {
                     className="hidden"
                   />
                 </label>
+
+                {editProductImageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCropTarget('product');
+                      setCropSrc(editProductImageUrl);
+                      setCropZoom(1.0);
+                      setCropPanX(0);
+                      setCropPanY(0);
+                      setShowCropModal(true);
+                    }}
+                    className="flex items-center justify-center space-x-1.5 px-4 bg-white hover:bg-[#2C2C2A]/5 text-[#2C2C2A]/70 hover:text-[#2C2C2A] border border-[#2C2C2A]/15 hover:border-[#2C2C2A]/30 rounded-lg cursor-pointer transition-all duration-200"
+                  >
+                    <RotateCw className="w-4 h-4 text-[#5A6351]" />
+                    <span className="font-sans-ui text-xs font-bold">裁切圖片</span>
+                  </button>
+                )}
 
                 {editProductImageUrl && (
                   <div className="w-14 h-14 rounded-lg overflow-hidden border border-[#2C2C2A]/10 flex-shrink-0">
@@ -1697,6 +1678,7 @@ export const PRODUCTS: Product[] = ${JSON.stringify(targetProducts, null, 2)};
     const reader = new FileReader();
     reader.onload = (event) => {
       if (event.target?.result) {
+        setCropTarget('story');
         setCropSrc(event.target.result as string);
         setCropZoom(1.0);
         setCropPanX(0);
@@ -1714,6 +1696,7 @@ export const PRODUCTS: Product[] = ${JSON.stringify(targetProducts, null, 2)};
       triggerToast('⚠️ 請輸入正確的聯網圖片網址！');
       return;
     }
+    setCropTarget('story');
     setCropSrc(url.trim());
     setCropZoom(1.0);
     setCropPanX(0);
@@ -1800,9 +1783,15 @@ export const PRODUCTS: Product[] = ${JSON.stringify(targetProducts, null, 2)};
       
       try {
         const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        setEditCoverImage(croppedDataUrl);
-        setShowCropModal(false);
-        triggerToast('✨ 封面圖已成功完成 1:1 裁切並即時套用！請點擊下方按鈕儲存變更。');
+        if (cropTarget === 'product') {
+          setEditProductImageUrl(croppedDataUrl);
+          setShowCropModal(false);
+          triggerToast('✨ 商品圖片已成功完成 1:1 裁切並即時套用！請確認下方欄位後點擊儲存。');
+        } else {
+          setEditCoverImage(croppedDataUrl);
+          setShowCropModal(false);
+          triggerToast('✨ 封面圖已成功完成 1:1 裁切並即時套用！請點擊下方按鈕儲存變更。');
+        }
       } catch (err) {
         console.error(err);
         triggerToast('❌ 圖片裁切匯出受限 (可能由於跨網域 CORS 問題，請嘗試從本機上傳圖片檔案即可完美避開此限制)。');
