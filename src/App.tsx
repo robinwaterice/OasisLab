@@ -222,9 +222,15 @@ export default function App() {
   const [storyUrlInput, setStoryUrlInput] = useState<string>('');
 
   // GitHub 雲端雙向同步狀態
-  const [githubUsername, setGithubUsername] = useState<string>(() => localStorage.getItem('oasis_github_username') || '');
-  const [githubRepo, setGithubRepo] = useState<string>(() => localStorage.getItem('oasis_github_repo') || 'OasisLab');
-  const [githubToken, setGithubToken] = useState<string>(() => localStorage.getItem('oasis_github_token') || '');
+  const [githubUsername, setGithubUsername] = useState<string>(() => 
+    localStorage.getItem('oasis_github_username') || import.meta.env.VITE_GITHUB_USERNAME || 'robinwaterice'
+  );
+  const [githubRepo, setGithubRepo] = useState<string>(() => 
+    localStorage.getItem('oasis_github_repo') || import.meta.env.VITE_GITHUB_REPO || 'OasisLab'
+  );
+  const [githubToken, setGithubToken] = useState<string>(() => 
+    localStorage.getItem('oasis_github_token') || import.meta.env.VITE_GITHUB_TOKEN || ''
+  );
   const [isSyncingToGithub, setIsSyncingToGithub] = useState<boolean>(false);
 
   // 內建自訂 3:2 裁切器狀態
