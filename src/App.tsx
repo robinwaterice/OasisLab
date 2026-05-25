@@ -50,7 +50,8 @@ import {
   GripVertical,
   Star,
   Copy,
-  FileJson
+  FileJson,
+  RotateCw
 } from 'lucide-react';
 import { Story, Product } from './types';
 import { STORIES, HISTORICAL_STORIES, NEXT_ISSUE_STORIES, PRODUCTS } from './data';
@@ -232,6 +233,43 @@ export default function App() {
     localStorage.getItem('oasis_github_token') || import.meta.env.VITE_GITHUB_TOKEN || ''
   );
   const [isSyncingToGithub, setIsSyncingToGithub] = useState<boolean>(false);
+  const [githubConnectionStatus, setGithubConnectionStatus] = useState<'checking' | 'success' | 'error'>('checking');
+
+  // 驗證 GitHub 雲端自動同步連線狀態
+  const checkGithubConnection = async () => {
+    const username = githubUsername.trim() || import.meta.env.VITE_GITHUB_USERNAME || '';
+    const repo = githubRepo.trim() || import.meta.env.VITE_GITHUB_REPO || 'OasisLab';
+    const token = githubToken.trim() || import.meta.env.VITE_GITHUB_TOKEN || '';
+
+    if (!username || !repo || !token) {
+      setGithubConnectionStatus('error');
+      return;
+    }
+
+    setGithubConnectionStatus('checking');
+    try {
+      const apiEndpoint = `https://api.github.com/repos/${username}/${repo}`;
+      const res = await fetch(apiEndpoint, {
+        headers: {
+          'Authorization': `token ${token}`,
+          'Accept': 'application/vnd.github.v3+json'
+        }
+      });
+      if (res.ok) {
+        setGithubConnectionStatus('success');
+      } else {
+        setGithubConnectionStatus('error');
+      }
+    } catch (e) {
+      setGithubConnectionStatus('error');
+    }
+  };
+
+  // 當使用者開啟後台或設定變更時自動偵測連線狀態
+  useEffect(() => {
+    checkGithubConnection();
+  }, [githubUsername, githubRepo, githubToken]);
+
 
   // 內建自訂 3:2 裁切器狀態
   const [showCropModal, setShowCropModal] = useState<boolean>(false);
@@ -276,6 +314,9 @@ export default function App() {
       const reordered = arrayMove(editableProducts, oldIndex, newIndex);
       setEditableProducts(reordered);
       try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(reordered)); } catch(e) {}
+      
+      // ⚡ 自動背景同步至 GitHub
+      silentSyncToGithub(activeStories, archivedStories, reordered);
     }
   };
 
@@ -607,6 +648,7 @@ export default function App() {
                 const next = [newProduct, ...editableProducts];
                 setEditableProducts(next);
                 try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(next)); } catch(e) {}
+                silentSyncToGithub(activeStories, archivedStories, next);
                 setProductOffsets(prev => ({
                   ...prev,
                   [newId]: Math.floor(Math.random() * 500) + 500
@@ -635,6 +677,7 @@ export default function App() {
                 });
                 setEditableProducts(updatedProducts);
                 try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(updatedProducts)); } catch(e) {}
+                silentSyncToGithub(activeStories, archivedStories, updatedProducts);
                 triggerToast(`✨ 商品《${editProductTitle.slice(0, 15)}...》已成功更新並即時同步至前台！`);
               }
             }}
@@ -651,6 +694,7 @@ export default function App() {
                   const next = editableProducts.filter(p => p.id !== selectedEditProductId);
                   setEditableProducts(next);
                   try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(next)); } catch(e) {}
+                  silentSyncToGithub(activeStories, archivedStories, next);
                   setSelectedEditProductId('');
                   setConfirmDeleteProductId('');
                   triggerToast(`🗑️ 商品《${editProductTitle.slice(0,12)}...》已刪除，前台即時同步移除。`);
@@ -1213,6 +1257,10 @@ export default function App() {
       
       setCurrentIssueNumber(nextIssueNum);
       triggerToast(`✨ 聯網搜尋與 AI 寫作成功！已為您發行全新第 ${String(nextIssueNum).padStart(3, '0')} 期高質感專題期刊！`);
+      
+      // ⚡ 自動背景同步至 GitHub
+      const mergedArchived = Array.from(new Map([...activeStories, ...archivedStories].map(s => [s.id, s])).values());
+      silentSyncToGithub(uniqueParsedStories, mergedArchived, editableProducts);
 
     } catch (error: any) {
       console.error('AI Journal Curation Error:', error);
@@ -1283,7 +1331,7 @@ export default function App() {
 
   // 儲存並發布後台修改的專題文字
   const handleSaveStoryEdits = () => {
-    setActiveStories(prev => prev.map(s => {
+    const next = activeStories.map(s => {
       if (s.id === selectedEditStoryId) {
         return {
           ...s,
@@ -1294,8 +1342,12 @@ export default function App() {
         };
       }
       return s;
-    }));
+    });
+    setActiveStories(next);
     triggerToast(`✨ 已成功更新專題《${editTitle}》的文字與封面圖內容，並即時發布至前台！`);
+    
+    // ⚡ 默默自動同步至 GitHub
+    silentSyncToGithub(next, archivedStories, editableProducts);
   };
 
   // 一鍵複製所有編輯內容為 Markdown 格式
@@ -1356,23 +1408,27 @@ ${editContent}`;
     }
   };
 
-  // ⚡ 一鍵雲端同步至 GitHub (自動 Commit & Push)
-  const handleSyncToGithub = async () => {
-    if (!githubUsername.trim() || !githubRepo.trim() || !githubToken.trim()) {
-      triggerToast('⚠️ 請先填寫完整的 GitHub 設定（帳號、倉庫名與 Token）！');
+  // ⚡ 在背景默默執行 GitHub 同步，不打斷使用者操作
+  const silentSyncToGithub = async (
+    customActive?: Story[],
+    customArchived?: Story[],
+    customProducts?: Product[]
+  ) => {
+    const username = githubUsername.trim() || import.meta.env.VITE_GITHUB_USERNAME || '';
+    const repo = githubRepo.trim() || import.meta.env.VITE_GITHUB_REPO || 'OasisLab';
+    const token = githubToken.trim() || import.meta.env.VITE_GITHUB_TOKEN || '';
+
+    // 若未配置 GitHub 密鑰，則不執行背景同步 (本地測試情境)
+    if (!username || !repo || !token) {
+      setGithubConnectionStatus('error');
       return;
     }
 
-    setIsSyncingToGithub(true);
-    triggerToast('⚡ 正在啟動 GitHub 雲端編譯同步，請稍候...');
-
     try {
-      // 1. 儲存設定至本地 localStorage
-      localStorage.setItem('oasis_github_username', githubUsername.trim());
-      localStorage.setItem('oasis_github_repo', githubRepo.trim());
-      localStorage.setItem('oasis_github_token', githubToken.trim());
+      const targetActive = customActive || activeStories;
+      const targetArchived = customArchived || archivedStories;
+      const targetProducts = customProducts || editableProducts;
 
-      // 2. 構建要寫入的 data.ts 檔案內容
       const updatedDataTs = `/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -1380,21 +1436,20 @@ ${editContent}`;
 
 import { Story, Product } from './types';
 
-export const STORIES: Story[] = ${JSON.stringify(activeStories, null, 2)};
+export const STORIES: Story[] = ${JSON.stringify(targetActive, null, 2)};
 
-export const HISTORICAL_STORIES: Story[] = ${JSON.stringify(archivedStories, null, 2)};
+export const HISTORICAL_STORIES: Story[] = ${JSON.stringify(targetArchived, null, 2)};
 
 export const NEXT_ISSUE_STORIES: Story[] = ${JSON.stringify(NEXT_ISSUE_STORIES, null, 2)};
 
-export const PRODUCTS: Product[] = ${JSON.stringify(editableProducts, null, 2)};
+export const PRODUCTS: Product[] = ${JSON.stringify(targetProducts, null, 2)};
 `;
 
-      const apiEndpoint = `https://api.github.com/repos/${githubUsername.trim()}/${githubRepo.trim()}/contents/src/data.ts`;
+      const apiEndpoint = `https://api.github.com/repos/${username}/${repo}/contents/src/data.ts`;
       
-      // 3. 獲取現有檔案的 sha
       const getFileRes = await fetch(apiEndpoint, {
         headers: {
-          'Authorization': `token ${githubToken.trim()}`,
+          'Authorization': `token ${token}`,
           'Accept': 'application/vnd.github.v3+json'
         }
       });
@@ -1403,12 +1458,12 @@ export const PRODUCTS: Product[] = ${JSON.stringify(editableProducts, null, 2)};
       if (getFileRes.ok) {
         const fileData = await getFileRes.json();
         sha = fileData.sha;
+        setGithubConnectionStatus('success');
       } else if (getFileRes.status !== 404) {
-        throw new Error('無法獲取 GitHub 上的檔案狀態，請確認設定或 Token 是否正確。');
+        setGithubConnectionStatus('error');
+        return; // 靜默忽略錯誤
       }
 
-      // 4. 發起 PUT 請求寫回 data.ts (即 Commit & Push)
-      // 使用 Base64 編碼，需要處理中文 (UTF-8) 的 Base64 編碼問題
       const utf8B64 = btoa(encodeURIComponent(updatedDataTs).replace(/%([0-9A-F]{2})/g, (match, p1) => {
         return String.fromCharCode(parseInt(p1, 16));
       }));
@@ -1416,7 +1471,7 @@ export const PRODUCTS: Product[] = ${JSON.stringify(editableProducts, null, 2)};
       const putRes = await fetch(apiEndpoint, {
         method: 'PUT',
         headers: {
-          'Authorization': `token ${githubToken.trim()}`,
+          'Authorization': `token ${token}`,
           'Content-Type': 'application/json',
           'Accept': 'application/vnd.github.v3+json'
         },
@@ -1427,17 +1482,15 @@ export const PRODUCTS: Product[] = ${JSON.stringify(editableProducts, null, 2)};
         })
       });
 
-      if (!putRes.ok) {
-        const errJson = await putRes.json();
-        throw new Error(errJson.message || '提交變更失敗');
+      if (putRes.ok) {
+        triggerToast('☁️ 雲端同步成功！GitHub 與線上網址已全自動更新！');
+        setGithubConnectionStatus('success');
+      } else {
+        setGithubConnectionStatus('error');
       }
-
-      triggerToast('🎉 雲端雙向同步成功！GitHub 已更新，Cloudflare 正在自動進行新版部署，預計 1 分鐘後正式生效！');
-    } catch (error: any) {
-      console.error(error);
-      triggerToast(`⚠️ 同步失敗: ${error.message || error}`);
-    } finally {
-      setIsSyncingToGithub(false);
+    } catch (e) {
+      console.warn('GitHub 背景自動同步失敗:', e);
+      setGithubConnectionStatus('error');
     }
   };
 
@@ -2807,18 +2860,61 @@ ${inputVal}
                           </h3>
                         </div>
                       </div>
-                      <button
-                        onClick={() => {
-                          setIsAdminLoggedIn(false);
-                          setAdminUsername('');
-                          setAdminPassword('');
-                          triggerToast('🔒 已安全登出 Oasis Lab. 系統智理後台。');
-                        }}
-                        className="px-4 py-2 border border-red-200 hover:bg-red-50 text-red-500 text-xs font-sans-ui font-semibold rounded-lg cursor-pointer transition-colors flex items-center space-x-1.5"
-                      >
-                        <Lock className="w-3.5 h-3.5" />
-                        <span>安全登出</span>
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        {/* 雲端自動同步連線狀態指示燈 */}
+                        <div
+                          className="flex items-center space-x-2 px-3 py-1.5 bg-[#F4F4F3] border border-[#2C2C2A]/5 rounded-lg select-none"
+                        >
+                          <span className="relative flex h-2 w-2">
+                            {githubConnectionStatus === 'success' && (
+                              <>
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                              </>
+                            )}
+                            {githubConnectionStatus === 'error' && (
+                              <>
+                                <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                              </>
+                            )}
+                            {githubConnectionStatus === 'checking' && (
+                              <>
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                              </>
+                            )}
+                          </span>
+                          <span className="text-[10px] font-sans-ui font-bold text-[#2C2C2A]/60">
+                            {githubConnectionStatus === 'success' && '雲端同步正常'}
+                            {githubConnectionStatus === 'error' && '雲端連線異常'}
+                            {githubConnectionStatus === 'checking' && '連線檢測中...'}
+                          </span>
+                        </div>
+
+                        {/* 手動重測刷新按鈕 */}
+                        <button
+                          onClick={checkGithubConnection}
+                          disabled={githubConnectionStatus === 'checking'}
+                          title="點擊重新檢測雲端連線狀態"
+                          className="p-1.5 bg-[#F4F4F3] hover:bg-[#2C2C2A]/5 border border-[#2C2C2A]/5 hover:border-[#2C2C2A]/10 rounded-lg text-[#2C2C2A]/50 hover:text-[#2C2C2A]/80 transition-all cursor-pointer disabled:cursor-not-allowed flex items-center justify-center"
+                        >
+                          <RotateCw className={`w-3.5 h-3.5 ${githubConnectionStatus === 'checking' ? 'animate-spin text-amber-500' : ''}`} />
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setIsAdminLoggedIn(false);
+                            setAdminUsername('');
+                            setAdminPassword('');
+                            triggerToast('🔒 已安全登出 Oasis Lab. 系統智理後台。');
+                          }}
+                          className="px-4 py-2 border border-red-200 hover:bg-red-50 text-red-500 text-xs font-sans-ui font-semibold rounded-lg cursor-pointer transition-colors flex items-center space-x-1.5"
+                        >
+                          <Lock className="w-3.5 h-3.5" />
+                          <span>安全登出</span>
+                        </button>
+                      </div>
                     </div>
 
                     {/* Tab 導覽欄 */}
@@ -3245,6 +3341,7 @@ ${inputVal}
                                 onClick={() => {
                                   setEditableProducts(PRODUCTS);
                                   try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(PRODUCTS)); } catch(e) {}
+                                  silentSyncToGithub(activeStories, archivedStories, PRODUCTS);
                                   setSelectedEditProductId('');
                                   triggerToast('🔄 商品資料已重置為系統預設值。');
                                 }}
@@ -3335,6 +3432,7 @@ ${inputVal}
                                               const next = editableProducts.filter(p => p.id !== product.id);
                                               setEditableProducts(next);
                                               try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(next)); } catch(e) {}
+                                              silentSyncToGithub(activeStories, archivedStories, next);
                                               setConfirmDeleteProductId('');
                                               if (selectedEditProductId === product.id) setSelectedEditProductId('');
                                               triggerToast(`🗑️ 商品《${product.title_optimized.slice(0,12)}...》已刪除，前台即時同步移除。`);
@@ -3401,81 +3499,7 @@ ${inputVal}
                         transition={{ duration: 0.3 }}
                         className="space-y-6"
                       >
-                        {/* ⚡ GitHub 雲端一鍵雙向同步卡片 */}
-                        <div className="bg-gradient-to-br from-[#5A6351]/10 to-transparent border border-[#5A6351]/20 rounded-2xl p-8 shadow-[0_4px_24px_rgba(90,99,81,0.06)] space-y-5">
-                          <div className="flex items-center space-x-3 pb-4 border-b border-[#5A6351]/15">
-                            <div className="p-2 bg-[#5A6351] rounded-lg">
-                              <Sparkles className="w-4 h-4 text-white" />
-                            </div>
-                            <div>
-                              <span className="font-mono-data text-[10px] text-[#5A6351] font-bold tracking-widest uppercase block">GITHUB CLOUD SYNC // 雲端一鍵雙向同步中心</span>
-                              <p className="font-sans-ui text-xs text-[#2C2C2A]/60 mt-0.5">直接將線上後台的修改 Commit & Push 至您的 GitHub 倉庫，自動觸發 Cloudflare Pages 重新編譯部署</p>
-                            </div>
-                          </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-sans-ui">
-                            <div>
-                              <label className="block text-[#2C2C2A]/60 font-bold mb-1.5">1. GitHub 帳號 (Username)</label>
-                              <input 
-                                type="text"
-                                value={githubUsername}
-                                onChange={(e) => setGithubUsername(e.target.value)}
-                                placeholder="例如: robinwaterice"
-                                className="w-full bg-white/80 border border-[#2C2C2A]/15 text-[#2C2C2A] px-3.5 py-2.5 rounded-lg focus:outline-none focus:border-[#5A6351] transition-all"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[#2C2C2A]/60 font-bold mb-1.5">2. 倉庫名稱 (Repository)</label>
-                              <input 
-                                type="text"
-                                value={githubRepo}
-                                onChange={(e) => setGithubRepo(e.target.value)}
-                                placeholder="預設: OasisLab"
-                                className="w-full bg-white/80 border border-[#2C2C2A]/15 text-[#2C2C2A] px-3.5 py-2.5 rounded-lg focus:outline-none focus:border-[#5A6351] transition-all"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[#2C2C2A]/60 font-bold mb-1.5">3. 個人訪問令牌 (GitHub PAT Token)</label>
-                              <input 
-                                type="password"
-                                value={githubToken}
-                                onChange={(e) => setGithubToken(e.target.value)}
-                                placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                                className="w-full bg-white/80 border border-[#2C2C2A]/15 text-[#2C2C2A] px-3.5 py-2.5 rounded-lg focus:outline-none focus:border-[#5A6351] transition-all"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="pt-2">
-                            <button
-                              type="button"
-                              onClick={handleSyncToGithub}
-                              disabled={isSyncingToGithub}
-                              className={`w-full py-3.5 text-white text-xs font-sans-ui font-bold rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 ${
-                                isSyncingToGithub
-                                  ? 'bg-[#5A6351]/50 cursor-not-allowed'
-                                  : 'bg-[#5A6351] hover:bg-[#4E5646] cursor-pointer hover:shadow-lg'
-                              }`}
-                            >
-                              {isSyncingToGithub ? (
-                                <>
-                                  <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}>
-                                    <Sparkles className="w-4 h-4 text-white" />
-                                  </motion.div>
-                                  <span>正在編譯同步並提交變更至 GitHub...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Sparkles className="w-4 h-4 text-white" />
-                                  <span>⚡ 立即執行一鍵雲端雙向同步 (Commit & Push)</span>
-                                </>
-                              )}
-                            </button>
-                            <span className="block text-[10px] text-[#2C2C2A]/40 mt-2 text-center leading-relaxed">
-                              🔒 隱私安全承諾：您的 GitHub Token 僅保存在您當前瀏覽器的 LocalStorage 中，完全由前端發起 API 呼叫，絕無任何中轉伺服器，安全無慮。
-                            </span>
-                          </div>
-                        </div>
 
                         <div className="bg-white border border-[#2C2C2A]/10 rounded-2xl p-8 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
                           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-[#2C2C2A]/5 mb-6">
