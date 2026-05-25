@@ -1,4 +1,9 @@
-const key = process.env.VITE_GEMINI_API_KEY || 'AIzaSyAivCTZaBF8V8rmpVAbxCbS6YROCOXPskI';
+try {
+  require('dotenv').config();
+} catch (e) {
+  // dotenv not installed globally or not found
+}
+const key = process.env.VITE_GEMINI_API_KEY;
 const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
 
 const requestBody = {
