@@ -51,7 +51,8 @@ import {
   Star,
   Copy,
   FileJson,
-  RotateCw
+  RotateCw,
+  Upload
 } from 'lucide-react';
 import { Story, Product } from './types';
 import { STORIES, HISTORICAL_STORIES, NEXT_ISSUE_STORIES, PRODUCTS } from './data';
@@ -489,6 +490,69 @@ export default function App() {
     setSelectedProductDetail(product);
   };
 
+  // ================== 【自訂商品圖片上傳與壓縮功能】 ==================
+  const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      triggerToast('⚠️ 請選擇正確的圖片檔案！');
+      return;
+    }
+
+    triggerToast('⏳ 正在上傳並最佳化商品圖片...');
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        const img = new Image();
+        img.src = event.target.result as string;
+        img.onload = () => {
+          // 為避免 LocalStorage 超出 5MB 限制，進行圖片壓縮與縮放至最高 600x600 尺寸
+          const canvas = document.createElement('canvas');
+          const maxDim = 600;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            try {
+              // 壓縮為高品質 jpeg (0.8) 減少 byte 數
+              const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+              setEditProductImageUrl(compressedDataUrl);
+              triggerToast('✨ 商品圖片已成功上傳並最佳化！儲存商品後即可即時發布。');
+            } catch (err) {
+              // Fallback to original read if canvas fails
+              setEditProductImageUrl(event.target?.result as string);
+              triggerToast('✨ 商品圖片上傳成功！');
+            }
+          } else {
+            setEditProductImageUrl(event.target?.result as string);
+            triggerToast('✨ 商品圖片上傳成功！');
+          }
+        };
+        img.onerror = () => {
+          triggerToast('❌ 讀取圖片檔案失敗，請換一張試試。');
+        };
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = ''; // 重置 input 讓同一個檔案可重複點選
+  };
+
   // 商品即時編輯表單之輔助函數
   const renderProductEditForm = (isNew: boolean = false) => {
     return (
@@ -545,20 +609,38 @@ export default function App() {
             />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">商品圖片 URL</label>
-            <div className="flex gap-3">
-              <input
-                type="url"
-                value={editProductImageUrl}
-                onChange={(e) => setEditProductImageUrl(e.target.value)}
-                placeholder="https://images.unsplash.com/..."
-                className="flex-1 bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-mono-data transition-all"
-              />
-              {editProductImageUrl && (
-                <div className="w-14 h-14 rounded-lg overflow-hidden border border-[#2C2C2A]/10 flex-shrink-0">
-                  <img src={editProductImageUrl} alt="預覽" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                </div>
-              )}
+            <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">商品圖片 URL / 本機上傳</label>
+            <div className="flex flex-col gap-3">
+              <div className="flex gap-3">
+                <input
+                  type="url"
+                  value={editProductImageUrl}
+                  onChange={(e) => setEditProductImageUrl(e.target.value)}
+                  placeholder="https://images.unsplash.com/ 或上傳本機圖片..."
+                  className="flex-1 bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-mono-data transition-all"
+                />
+                
+                {/* 本機上傳按鈕 */}
+                <label className="flex items-center justify-center space-x-1.5 px-4 bg-white hover:bg-[#2C2C2A]/5 text-[#2C2C2A]/70 hover:text-[#2C2C2A] border border-[#2C2C2A]/15 hover:border-[#2C2C2A]/30 rounded-lg cursor-pointer transition-all duration-200">
+                  <Upload className="w-4 h-4 text-[#5A6351]" />
+                  <span className="font-sans-ui text-xs font-bold">上傳圖片</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProductImageUpload}
+                    className="hidden"
+                  />
+                </label>
+
+                {editProductImageUrl && (
+                  <div className="w-14 h-14 rounded-lg overflow-hidden border border-[#2C2C2A]/10 flex-shrink-0">
+                    <img src={editProductImageUrl} alt="預覽" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  </div>
+                )}
+              </div>
+              <p className="text-[10px] text-[#2C2C2A]/40 font-sans-ui">
+                💡 支援直接貼上聯網圖片網址，或點選「上傳圖片」選擇本機照片，系統將自動進行壓縮優化以確保順暢載入。
+              </p>
             </div>
           </div>
           <div>
