@@ -626,7 +626,7 @@ export default function App() {
                 )}
               </div>
               <p className="text-[10px] text-[#2C2C2A]/40 font-sans-ui">
-                💡 支援直接貼上聯網圖片網址，或點選「上傳圖片」選擇本機照片，系統將自動進行壓縮優化以確保順暢載入。
+                💡 <strong>建議規格：1:1 正方形（600 x 600 像素）</strong>。支援貼上網址或點選「上傳圖片」，系統將引導手動對焦裁切並自動優化儲存，以確保與其他官方商品尺寸一致且載入順暢。
               </p>
             </div>
           </div>
@@ -1747,17 +1747,18 @@ export const PRODUCTS: Product[] = ${JSON.stringify(targetProducts, null, 2)};
   const handleApplyCrop = () => {
     if (!cropSrc) return;
     
-    triggerToast('⏳ 正在生成 1:1 高畫質裁切封面圖 (1000x1000)...');
+    const outputSize = cropTarget === 'product' ? 600 : 1000;
+    triggerToast(`⏳ 正在生成 1:1 高畫質裁切圖片 (${outputSize}x${outputSize})...`);
     
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.src = cropSrc;
     
     img.onload = () => {
-      // 建立一個 1000x1000 的 Canvas 用於高品質裁剪輸出 (完美符合 1:1 封面圖尺寸)
+      // 依據裁切目標動態建立輸出 Canvas 尺寸 (商品圖 600x600, 封面圖 1000x1000)
       const canvas = document.createElement('canvas');
-      canvas.width = 1000;
-      canvas.height = 1000;
+      canvas.width = outputSize;
+      canvas.height = outputSize;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       
