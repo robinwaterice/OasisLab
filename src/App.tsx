@@ -299,6 +299,12 @@ export default function App() {
   const [editProductTags, setEditProductTags] = useState<string>('');
   const [editProductStatus, setEditProductStatus] = useState<'active' | 'pending' | 'draft'>('active');
   const [editProductIsPopular, setEditProductIsPopular] = useState<boolean>(false);
+  const [editProductStoryBehind, setEditProductStoryBehind] = useState<string>('');
+  const [editProductFeature1, setEditProductFeature1] = useState<string>('');
+  const [editProductFeature2, setEditProductFeature2] = useState<string>('');
+  const [editProductFeature3, setEditProductFeature3] = useState<string>('');
+  const [editProductSpecsText, setEditProductSpecsText] = useState<string>('');
+  const [editProductDesignerCritique, setEditProductDesignerCritique] = useState<string>('');
   const [confirmDeleteProductId, setConfirmDeleteProductId] = useState<string>('');
 
   // DnD 感應器設定
@@ -707,12 +713,84 @@ export default function App() {
               className="w-full bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui leading-relaxed transition-all resize-none"
             />
           </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">商品精美設計故事與理念 (Story Behind)</label>
+            <textarea
+              rows={4}
+              value={editProductStoryBehind}
+              onChange={(e) => setEditProductStoryBehind(e.target.value)}
+              placeholder="撰寫一個符合選物美學、語氣溫潤優雅的商品人文故事..."
+              className="w-full bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui leading-relaxed transition-all resize-none"
+            />
+          </div>
+          <div className="md:col-span-2 space-y-2">
+            <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-1">商品三大設計亮點 (Features)</label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <input
+                type="text"
+                value={editProductFeature1}
+                onChange={(e) => setEditProductFeature1(e.target.value)}
+                placeholder="設計亮點 1"
+                className="w-full bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3 py-2.5 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui transition-all"
+              />
+              <input
+                type="text"
+                value={editProductFeature2}
+                onChange={(e) => setEditProductFeature2(e.target.value)}
+                placeholder="設計亮點 2"
+                className="w-full bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3 py-2.5 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui transition-all"
+              />
+              <input
+                type="text"
+                value={editProductFeature3}
+                onChange={(e) => setEditProductFeature3(e.target.value)}
+                placeholder="設計亮點 3"
+                className="w-full bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3 py-2.5 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui transition-all"
+              />
+            </div>
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">主編深度美學講評 (Designer Critique)</label>
+            <textarea
+              rows={3}
+              value={editProductDesignerCritique}
+              onChange={(e) => setEditProductDesignerCritique(e.target.value)}
+              placeholder="從策展人或主編角度撰寫深度、專業的美學講評與推薦理由..."
+              className="w-full bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui leading-relaxed transition-all resize-none"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">完整的工藝或技術規格 (Specifications - 每行一對以冒號分隔)</label>
+            <textarea
+              rows={4}
+              value={editProductSpecsText}
+              onChange={(e) => setEditProductSpecsText(e.target.value)}
+              placeholder="材質: 北美胡桃木&#10;尺寸: 100 x 100 x 15 mm&#10;產地: 台灣手工製作"
+              className="w-full bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-mono-data leading-relaxed transition-all resize-none"
+            />
+            <p className="text-[10px] text-[#2C2C2A]/40 font-sans-ui mt-1">💡 格式範例：`材質: 胡桃木`。每行一對，將自動為前台排版為精美表格規格。</p>
+          </div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 pt-3 border-t border-[#2C2C2A]/8">
           <button
             type="button"
             onClick={() => {
+              // 解析特色與規格
+              const featuresArray = [editProductFeature1.trim(), editProductFeature2.trim(), editProductFeature3.trim()].filter(Boolean);
+              const parsedSpecs = editProductSpecsText.split('\n')
+                .map(line => {
+                  const parts = line.split(/[:：]/);
+                  if (parts.length >= 2) {
+                    return {
+                      label: parts[0].trim(),
+                      value: parts.slice(1).join(':').trim()
+                    };
+                  }
+                  return null;
+                })
+                .filter(Boolean) as { label: string; value: string }[];
+
               if (isNew) {
                 const newId = `prod-custom-${Date.now()}`;
                 const newProduct: Product = {
@@ -725,7 +803,11 @@ export default function App() {
                   status: editProductStatus,
                   is_popular: editProductIsPopular,
                   image_url: editProductImageUrl || 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=600&q=80',
-                  description: editProductDescription || ''
+                  description: editProductDescription || '',
+                  story_behind: editProductStoryBehind.trim() || undefined,
+                  features: featuresArray.length > 0 ? featuresArray : undefined,
+                  specifications: parsedSpecs.length > 0 ? parsedSpecs : undefined,
+                  designer_critique: editProductDesignerCritique.trim() || undefined
                 };
                 const next = [newProduct, ...editableProducts];
                 setEditableProducts(next);
@@ -754,7 +836,11 @@ export default function App() {
                     image_url: editProductImageUrl,
                     context_tags: editProductTags.split(',').map(t => t.trim()).filter(Boolean),
                     status: editProductStatus,
-                    is_popular: editProductIsPopular
+                    is_popular: editProductIsPopular,
+                    story_behind: editProductStoryBehind.trim() || undefined,
+                    features: featuresArray.length > 0 ? featuresArray : undefined,
+                    specifications: parsedSpecs.length > 0 ? parsedSpecs : undefined,
+                    designer_critique: editProductDesignerCritique.trim() || undefined
                   };
                 });
                 setEditableProducts(updatedProducts);
@@ -1119,9 +1205,6 @@ export default function App() {
 
     try {
       let apiKey = localStorage.getItem('oasis_gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || '';
-      if (apiKey.trim() === 'AIzaSyAivCTZaBF8V8rmpVAbxCbS6YROCOXPskI') {
-        apiKey = 'AIzaSyDkfindviZUmD6slxiv_AhSsOAzB4cwcHg';
-      }
       if (!apiKey || apiKey.trim() === '' || apiKey.startsWith('nvapi-')) {
         throw new Error('API Key is missing or invalid. Please configure a valid VITE_GEMINI_API_KEY in .env or local storage.');
       }
@@ -1741,9 +1824,6 @@ export const PRODUCTS: Product[] = ${JSON.stringify(targetProducts, null, 2)};
     setIsAiAutoFilling(true);
     try {
       let apiKey = localStorage.getItem('oasis_gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || '';
-      if (apiKey.trim() === 'AIzaSyAivCTZaBF8V8rmpVAbxCbS6YROCOXPskI') {
-        apiKey = 'AIzaSyDkfindviZUmD6slxiv_AhSsOAzB4cwcHg';
-      }
       if (!apiKey || apiKey.trim() === '' || apiKey.startsWith('nvapi-')) {
         throw new Error('請設定有效的 VITE_GEMINI_API_KEY 環境變數或瀏覽器 LocalStorage 中。');
       }
@@ -1754,30 +1834,48 @@ export const PRODUCTS: Product[] = ${JSON.stringify(targetProducts, null, 2)};
 使用者提供了以下聯盟行銷商品網址：
 ${inputVal}
 
-請先使用 Google Search 工具搜尋此網址對應的商品，取得正確的商品名稱、價格、商品特色、品牌等真實資訊，然後以 Oasis Lab. 極簡美學雜誌的高質感文案風格，生成以下 JSON 格式的商品資料（所有文字用繁體中文）：
+請先使用 Google Search 工具搜尋此網址對應的商品，取得正確的商品名稱、價格、商品特色、品牌等真實資訊，然後以 Oasis Lab. 極簡美學雜誌的高質感文案風格，生成以下 JSON 格式 of 商品資料（所有文字用繁體中文，且不要包含任何額外的 Markdown 包裹，只輸出一個純 JSON 字串）：
 {
-  "title_optimized": "根據搜尋結果精煉優化的商品名稱（30字以內，突顯核心賣點與設計感）",
+  "title_optimized": "根據搜尋結果精煉優化的商品名稱（30字以內，突顯核心賣點與設計感，例如：極簡實木耳機支架）",
   "price_display": "根據搜尋結果填入真實售價，格式如 'NT$ 1,980' 或 '洽詢優惠'",
   "btn_text": "導購按鈕文字（8字以內，如：探索生活靈感、立即選購）",
   "description": "根據搜尋結果，一句話點出此商品的核心美學與生活場景（20-35字）",
   "context_tags": ["日常充電", "辦公室必備", "極簡旅行"] 中選擇最符合的1-2個，以陣列格式輸出,
-  "image_url": "從 Unsplash 選一張最符合商品美學的高清圖片完整 URL（含 ?auto=format&fit=crop&w=600&q=80 參數）"
+  "image_url": "從 Unsplash 選一張最符合商品美學的高清圖片完整 URL（含 ?auto=format&fit=crop&w=600&q=80 參數）",
+  "story_behind": "語氣溫潤優雅的設計理念人文故事。闡述商品如何解決都市生活的混亂並重拾美學專注。字數約 150-200 字左右。",
+  "features": ["精美的一句話商品核心特點或美學亮點1", "精美的一句話商品核心特點或美學亮點2", "精美的一句話商品核心特點或美學亮點3"],
+  "specifications": [
+    {"label": "規格標籤如 '材質'", "value": "規格值如 '特選有田燒陶瓷'"},
+    {"label": "規格標籤如 '尺寸'", "value": "規格值如 '120 x 120 x 85 mm'"},
+    {"label": "規格標籤如 '產地'", "value": "規格值如 '日本'"},
+    {"label": "規格標籤如 '保固'", "value": "規格值如 '一年'"}
+  ],
+  "designer_critique": "策展人/主編的深度美學講評。語氣高雅富有深度，字數約 80-120 字之間。"
 }
 只輸出 JSON，不要有任何說明文字或代碼區塊標記。`
         : `你是一位精通電商選物美學的 Oasis Lab. 商品策展編輯。
 使用者想上架以下商品（商品名稱/關鍵字）：
 「${inputVal}」
 
-請先使用 Google Search 工具搜尋此商品的最新資訊（包含價格、特色、品牌、用戶評價等），再以 Oasis Lab. 極簡美學雜誌的高質感文案風格，生成以下 JSON 格式的商品資料（所有文字用繁體中文）：
+請先使用 Google Search 工具搜尋此商品的最新資訊（包含價格、特色、品牌、用戶評價等），再以 Oasis Lab. 極簡美學雜誌的高質感文案風格，生成以下 JSON 格式 of 商品資料（所有文字用繁體中文，且不要包含任何額外的 Markdown 包裹，只輸出一個純 JSON 字串）：
 {
-  "title_optimized": "根據搜尋結果精煉優化的商品名稱（30字以內，突顯核心賣點與設計感）",
-  "price_display": "根據搜尋結果的真實市場售價，格式如 'NT$ 1,980'",
+  "title_optimized": "根據搜尋結果精煉優化的商品名稱（30字以內，突顯核心賣點與設計感，例如：極簡實木耳機支架）",
+  "price_display": "根據搜尋結果的真實市場售價，格式如 'NT$ 1,980' 或 '洽詢優惠'",
   "btn_text": "導購按鈕文字（8字以內，如：探索生活靈感、立即選購）",
   "description": "根據搜尋結果，一句話點出此商品的核心美學與生活場景（20-35字）",
   "context_tags": ["日常充電", "辦公室必備", "極簡旅行"] 中選擇最符合的1-2個，以陣列格式輸出,
-  "image_url": "從 Unsplash 選一張最符合商品美學的高清圖片完整 URL（含 ?auto=format&fit=crop&w=600&q=80 參數）"
+  "image_url": "從 Unsplash 選一張最符合商品美學的高清圖片完整 URL（含 ?auto=format&fit=crop&w=600&q=80 參數）",
+  "story_behind": "語氣溫潤優雅的設計理念人文故事。闡述商品如何解決都市生活的混亂並重拾美學專注。字數約 150-200 字左右。",
+  "features": ["精美的一句話商品核心特點或美學亮點1", "精美的一句話商品核心特點或美學亮點2", "精美的一句話商品核心特點或美學亮點3"],
+  "specifications": [
+    {"label": "規格標籤如 '材質'", "value": "規格值如 '特選有田燒陶瓷'"},
+    {"label": "規格標籤如 '尺寸'", "value": "規格值如 '120 x 120 x 85 mm'"},
+    {"label": "規格標籤如 '產地'", "value": "規格值如 '日本'"},
+    {"label": "規格標籤如 '保固'", "value": "規格值如 '一年'"}
+  ],
+  "designer_critique": "策展人/主編的深度美學講評。語氣高雅富有深度，字數約 80-120 字之間。"
 }
-只輸出 JSON，不要有任何說明文字或代碼區塊標記。`;
+只輸出 JSON，不要有防說明文字或代碼區塊標記。`;
 
       const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
       const requestBody = {
@@ -1843,6 +1941,16 @@ ${inputVal}
       if (parsed.image_url) setEditProductImageUrl(parsed.image_url);
       if (Array.isArray(parsed.context_tags)) setEditProductTags(parsed.context_tags.join(', '));
       if (isUrl) setEditProductUrl(inputVal);
+      if (parsed.story_behind) setEditProductStoryBehind(parsed.story_behind);
+      if (Array.isArray(parsed.features)) {
+        setEditProductFeature1(parsed.features[0] || '');
+        setEditProductFeature2(parsed.features[1] || '');
+        setEditProductFeature3(parsed.features[2] || '');
+      }
+      if (Array.isArray(parsed.specifications)) {
+        setEditProductSpecsText(parsed.specifications.map((s: any) => `${s.label}: ${s.value}`).join('\n'));
+      }
+      if (parsed.designer_critique) setEditProductDesignerCritique(parsed.designer_critique);
 
       // 若尚未選擇商品，自動切換到新增模式
       if (!selectedEditProductId || selectedEditProductId === '') {
@@ -3512,6 +3620,12 @@ ${inputVal}
                                                 setEditProductTags(product.context_tags.join(', '));
                                                 setEditProductStatus(product.status);
                                                 setEditProductIsPopular(product.is_popular ?? false);
+                                                setEditProductStoryBehind(product.story_behind || '');
+                                                setEditProductFeature1(product.features?.[0] || '');
+                                                setEditProductFeature2(product.features?.[1] || '');
+                                                setEditProductFeature3(product.features?.[2] || '');
+                                                setEditProductSpecsText(product.specifications ? product.specifications.map(s => `${s.label}: ${s.value}`).join('\n') : '');
+                                                setEditProductDesignerCritique(product.designer_critique || '');
                                                 setConfirmDeleteProductId('');
                                               }
                                             }}
