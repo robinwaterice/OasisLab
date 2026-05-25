@@ -133,56 +133,6 @@ export const NEXT_ISSUE_STORIES: Story[] = [
 
 export const PRODUCTS: Product[] = [
   {
-    "id": "prod-custom-1779633445402",
-    "title_optimized": "ScottyBear 復古磨毛棒球帽 | COLORADO 軟頂老帽",
-    "price_display": "NT$ 880",
-    "affiliate_url": "https://shopee.tw/ScottyBear%E2%84%A2%EF%B8%8F%E9%82%A3%E9%9A%BB%E7%86%8A-%E7%BE%8E%E5%BC%8F%E6%A3%92%E7%90%83%E5%B8%BD-%E8%BB%9F%E9%A0%82-%E6%A3%92%E7%90%83%E5%B8%BD-COLORADO-%E9%B4%A8%E8%88%8C%E5%B8%BD-%E5%BE%A9%E5%8F%A4%E7%A3%A8%E6%AF%9B-%E5%B8%BD%E5%AD%90-%E8%80%81%E5%B8%BD-CP067-i.114152885.20551235898?extraParams=%7B%22display_model_id%22%3A136858151591%2C%22model_selection_logic%22%3A3%7D",
-    "btn_text": "品味復古風尚",
-    "context_tags": [
-      "日常充電",
-      "極簡旅行"
-    ],
-    "status": "active",
-    "is_popular": true,
-    "image_url": "https://images.unsplash.com/photo-1631557026726-104c81069b18?auto=format&fit=crop&w=600&q=80",
-    "description": "戴上 ScottyBear 復古棒球帽，為日常穿搭注入隨性不羈的美式風格，展現獨特個人魅力。"
-  },
-  {
-    "id": "prod-custom-1779630432092",
-    "title_optimized": "純粹肌膚之語：Calvin Klein 輕柔舒適內著",
-    "price_display": "NT$ 880 / 慢活品味價",
-    "affiliate_url": "https://shopee.tw/%E3%80%90Calvin-Klein%E3%80%91-CK-Carousel-%E6%AF%94%E5%9F%BA%E5%B0%BC%E5%85%A7%E8%A4%B2_%E9%BB%91%E8%89%B2-i.1255220129.40953144223?extraParams=%7B%22display_model_id%22%3A149196562642%2C%22model_selection_logic%22%3A3%7D",
-    "btn_text": "品味貼身日常",
-    "context_tags": [
-      "日常充電"
-    ],
-    "status": "active",
-    "is_popular": true,
-    "image_url": "https://images.unsplash.com/photo-1627124156689-d437fef4544d?auto=format&fit=crop&w=600&q=80",
-    "description": "以極簡設計語彙，勾勒肌膚最純粹的舒適輪廓，為每日穿搭奠定無壓的優雅基石。",
-    "story_behind": "現代生活往往要求外在的璀璨奪目，然而真正的優雅始於內在的舒適與自信。這款內著，正是為尋求那份純粹肌膚之語的您所設計。它摒棄過多的繁複裝飾，回歸材質本身最原始的觸感與透氣性。在喧囂都市中，為您的身體提供一個靜謐的港灣，讓每一次穿戴都成為一場自我療癒的儀式。我們深信，貼身的選擇，不僅是衣物，更是生活態度的延伸，讓您在每一個微小細節中，都能感受到被溫柔呵護的慢活美學。",
-    "features": [
-      "精選高彈力棉質混紡，親膚透氣，提供全日無感舒適",
-      "簡約經典比基尼剪裁，完美貼合身形，展現自然線條",
-      "無痕腰帶設計，輕柔包覆不緊繃，避免印痕困擾"
-    ],
-    "specifications": [
-      {
-        "label": "材質",
-        "value": "優質棉質混紡 (90% 棉, 10% 彈性纖維)"
-      },
-      {
-        "label": "尺寸參數",
-        "value": "提供 XS, S, M, L 多種尺寸選擇"
-      },
-      {
-        "label": "產地製造",
-        "value": "國際品牌精選製造"
-      }
-    ],
-    "designer_critique": "內著是與身體最親密的對話。這款設計以減法哲學，讓材質與剪裁成為主角，完美詮釋了極簡美學中的「無形之美」，是品味人士不可或缺的貼身選物。"
-  },
-  {
     "id": "prod-01",
     "title_optimized": "無線桌上美學｜極簡磁吸三合一無線充電座",
     "price_display": "NT$ 2,480",
@@ -193,7 +143,7 @@ export const PRODUCTS: Product[] = [
       "辦公室必備"
     ],
     "status": "active",
-    "image_url": "https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=600&q=80",
+    "image_url": "https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=1080&q=100",
     "description": "懸浮磁吸設計，告別凌亂線材，為 iPhone、Apple Watch 與 AirPods 同時注入飽滿的桌面能量。",
     "story_behind": "在無線化桌面的演進中，這款三合一充電座將物理線材隱匿於無形。採用溫潤的陽極氧化鋁合金結合親膚矽膠，頂部以懸浮式磁吸結構將 iPhone 優雅支撐，使手機在充電時化身為案頭的極簡時鐘。底座則巧妙融入凹面羊毛氈質感，專為 AirPods 預留歸屬，實現了功能、材質與桌案空間的最佳視覺平衡。",
     "features": [
@@ -219,44 +169,7 @@ export const PRODUCTS: Product[] = [
         "value": "148 x 92 x 120 mm / 340g"
       }
     ],
-    "designer_critique": "這不只是一款充電器，更是一尊立於桌案的微型雕塑。它摒棄了傳統充電座的笨重與塑膠感，利用鋁合金的冰冷與羊毛氈的溫熱進行對話，在滿足多設備充電的同時，完美維持了案頭的視覺純粹性。",
-    "is_popular": true
-  },
-  {
-    "id": "prod-custom-1779630730080",
-    "title_optimized": "極簡多功能無線充電座：案頭美學與效率的靜謐交響",
-    "price_display": "NT$ 2,880 / 慢活限定",
-    "affiliate_url": "https://shopee.tw/product/12368345/6990610719",
-    "btn_text": "品味無擾充電",
-    "context_tags": [
-      "日常充電",
-      "辦公室必備"
-    ],
-    "status": "active",
-    "is_popular": false,
-    "image_url": "https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=600&q=80",
-    "description": "以溫潤實木與極簡線條勾勒充電新哲學，為您的數位生活注入一份寧靜與秩序。",
-    "story_behind": "在快節奏的都市生活中，充電往往成為一團糾結的線材與凌亂的桌面。Oasis Lab. 秉持對「減法生活」的追求，悉心打造這款極簡多功能無線充電座。我們相信，真正的效率不應犧牲美感，而是將繁複隱於無形。透過溫潤的木質與流暢的線條，它不僅是充電工具，更是案頭上一件靜默的藝術品，引導您重新找回專注，享受每一次充電時的從容與優雅。",
-    "features": [
-      "精選北美胡桃木與陽極氧化鋁合金，觸感溫潤細膩",
-      "支援多設備無線充電，告別凌亂線材，桌面清爽有序",
-      "智能溫控與多重安全防護，提供安心無憂的充電體驗"
-    ],
-    "specifications": [
-      {
-        "label": "材質",
-        "value": "精選北美胡桃木 / 陽極氧化鋁合金"
-      },
-      {
-        "label": "尺寸參數",
-        "value": "長 180mm x 寬 90mm x 高 15mm"
-      },
-      {
-        "label": "產地製造",
-        "value": "台灣設計 / 國際精品代工"
-      }
-    ],
-    "designer_critique": "這款充電座完美詮釋了 Oasis Lab. 對於生活器物的極致追求：化繁為簡，美學與實用並存。它不僅解決了充電的痛點，更提升了日常場景的視覺享受，是現代慢活美學的典範之作。"
+    "designer_critique": "這不只是一款充電器，更是一尊立於桌案的微型雕塑。它摒棄了傳統充電座的笨重與塑膠感，利用鋁合金的冰冷與羊毛氈的溫熱進行對話，在滿足多設備充電的同時，完美維持了案頭的視覺純粹性。"
   },
   {
     "id": "prod-02",
@@ -268,7 +181,7 @@ export const PRODUCTS: Product[] = [
       "極簡旅行"
     ],
     "status": "active",
-    "image_url": "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=600&q=80",
+    "image_url": "https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=1080&q=100",
     "description": "僅 1.6mm 極致厚度，可輕鬆置於皮夾與護照套內。強大全球定位網絡讓你的珍貴物件永不離線。",
     "story_behind": "對於漫遊在不同城市的旅人而言，安心感是無價的奢華。這款定位卡片將強大的 Apple Find My 全球定位技術壓縮至僅 1.6mm 的極致厚度。它可以無感地滑入任何一張植鞣皮革夾、護照套或名片夾中。外殼由高強度鋼化玻璃纖維與啞光金屬框架製成，防刮耐磨，默默地在喧囂的候機室或陌生的旅店中，為您的隨身物件提供不具侵入性的隱形守護。",
     "features": [
@@ -307,7 +220,7 @@ export const PRODUCTS: Product[] = [
       "辦公室必備"
     ],
     "status": "active",
-    "image_url": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=600&q=80",
+    "image_url": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1080&q=100",
     "description": "由有田燒職人純手工打造，多肋紋內部引流結構，精準控制萃取時流速，澄淨每一口咖啡的感官。",
     "story_behind": "晨光微熹，用一注溫水喚醒咖啡的香氣，是創造者進入專注心流的必經儀式。這款濾杯禮盒來自日本手作瓷器之鄉有田町，由擁有四十年經驗的職人手工拉胚與燒製。經典的 V60 錐形結構，搭配精心計算的角度與內部深邃的螺旋肋紋，使水流速度與萃取率達到完美的平衡，溫柔濾除所有雜味，留下最純淨明亮的花果感香氣。",
     "features": [
@@ -345,7 +258,7 @@ export const PRODUCTS: Product[] = [
       "辦公室必備"
     ],
     "status": "active",
-    "image_url": "https://images.unsplash.com/photo-1580481072645-022f9a6dbf27?auto=format&fit=crop&w=600&q=80",
+    "image_url": "https://images.unsplash.com/photo-1580481072645-022f9a6dbf27?auto=format&fit=crop&w=1080&q=100",
     "description": "環抱式仿生曲面結構，3D 高回彈記憶棉，完美填補久坐時的腰椎空隙，分散脊椎底部的沉重壓力。",
     "story_behind": "長時間專注於螢幕前，腰椎所承受的沉重壓力常常在無形中消磨著創造力。這款護腰墊採用仿生曲面結構，模擬雙手環抱脊椎的包覆感。內芯為高密度、慢回彈的 3D 記憶棉，能隨體溫與坐姿自動塑形，精準填補尾椎與椅背之間的空隙。外層使用特製的雙層蜂巢透氣網布，確保即使在悶熱的夏季午後，依然能保持乾爽，讓您的背部得到最溫柔可靠的物理支撐。",
     "features": [
@@ -384,7 +297,7 @@ export const PRODUCTS: Product[] = [
       "日常充電"
     ],
     "status": "active",
-    "image_url": "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=600&q=80",
+    "image_url": "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=1080&q=100",
     "description": "Cordura 防潑水耐磨面料，內置獨立 16 吋筆電防震層與快充線路穿孔，實踐最高度的移動美學。",
     "story_behind": "在穿梭於高鐵、候機室與共同工作空間的旅途中，一款全能且體面的背包是漫遊者的靈魂配件。這款雙肩包選用傳奇級 Cordura® 防撕裂防潑水面料，外觀呈現霧面極簡線條，無任何贅餘口袋。內部則規劃了精密的多維收納系統，包含獨立的 16 吋加厚筆電防震層、快取感應卡槽，以及巧妙隱匿的 Type-C 快充穿孔，完美調和了「都會通勤」與「輕裝遠行」的雙重需求。",
     "features": [
@@ -423,7 +336,7 @@ export const PRODUCTS: Product[] = [
       "極簡旅行"
     ],
     "status": "active",
-    "image_url": "https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=600&q=80",
+    "image_url": "https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=1080&q=100",
     "description": "雙層高效真空保溫，附有極簡式 LCD 感應式外蓋，讓你隨時調控日常補水，每一口皆是最純粹的溫度。",
     "story_behind": "水是流動的生命，而合適的溫度則決定了每一口飲水的感官體驗。這款保溫瓶設計靈感源自東方瓦片的層疊美學，瓶身表面以細緻的霧面防指紋烤漆覆蓋，帶來如陶土般溫潤的微摩擦觸感。瓶蓋頂端鑲嵌了一塊低功耗 LCD 觸控感應螢幕，只需輕觸便能即時讀取瓶內水溫，避免燙傷；雙層高真空不鏽鋼層，更能在極寒或酷暑下長效鎖溫。",
     "features": [
@@ -461,7 +374,7 @@ export const PRODUCTS: Product[] = [
       "辦公室必備"
     ],
     "status": "active",
-    "image_url": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=600&q=80",
+    "image_url": "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1080&q=100",
     "description": "採用天然美麗諾精紡羊毛氈，搭配抗滑天然栓木大底，溫潤軟熟的壓感，為長時打字的手術臂建立舒緩緩衝。",
     "story_behind": "桌面是創造力流淌的平原。這款電腦墊選用來自澳洲的高級美麗諾精紡羊毛，經過多次熱壓壓實，帶來厚實而細膩的天然壓感，能有效減輕手腕在長時間打字時與硬質桌面的摩擦。底層則貼心地結合了天然橡木皮與止滑橡膠，在保護桌面的同時，提供了絕佳的防滑穩定性能，用天然纖維的溫潤，為您日復一日的鍵盤工作編織一條無干擾的物理緩衝帶。",
     "features": [
@@ -501,7 +414,7 @@ export const PRODUCTS: Product[] = [
       "辦公室必備"
     ],
     "status": "active",
-    "image_url": "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=600&q=80",
+    "image_url": "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=1080&q=100",
     "description": "45dB 精準感知智慧調頻降噪，搭配低共振複合振膜，在任何咖啡廳或喧囂的車廂內，均能為您保留那份靈感淨土。",
     "story_behind": "在人聲嘈雜的城市中，安靜已成為最奢侈的渴望。這款真無線耳機採用了高規主動式降噪技術，能精準過濾咖啡廳與捷運車廂內的低頻噪音。耳機外觀以簡約圓潤的鵝卵石為設計語彙，外殼採用磨砂與拋光異材質拼接。內部搭載 10mm 複合生物振膜，在呈現下潛極深的醇厚低音之餘，亦保留了乾淨透明的文藝聲線，讓您隨時隨地開啟專屬的精神綠洲。",
     "features": [
@@ -528,44 +441,5 @@ export const PRODUCTS: Product[] = [
       }
     ],
     "designer_critique": "大多數降噪耳機在外型上都過於強調科技感，而這款耳機卻像一枚被溪水洗刷多年的鵝卵石，線條優雅極簡。它的聲音取向極其乾淨耐聽，適合播放民謠、古典或環境整合環境爵士，是您在混亂喧囂的都市中，最容易攜帶的一片聽覺微型綠洲。"
-  },
-  {
-    "id": "prod-09",
-    "title_optimized": "純粹的日常儀式｜天然純水嬰兒級厚型濕紙巾",
-    "price_display": "洽詢優惠",
-    "affiliate_url": "https://www.momoshop.com.tw/goods/GoodsDetail.jsp?i_code=9333331&Area=search&mdiv=403&oid=1_4&cid=index&kw=%E6%BF%95%E7%B4%99%E5%B7%BE",
-    "btn_text": "前往 momo 選購",
-    "context_tags": [
-      "辦公室必備",
-      "日常充電"
-    ],
-    "status": "active",
-    "image_url": "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=600&q=80",
-    "description": "99% 純水配方，不含酒精與螢光劑，以嬰兒等級的溫柔標準，守護每一次日常肌膚的輕盈接觸。",
-    "story_behind": "在快節奏的辦公室生活中，雙手的清潔往往被遺忘在一杯咖啡與一場視訊會議之間。這款純水濕紙巾以近乎清水的配方出發，嚴格遵循嬰兒肌膚標準研製，拒絕任何化學添加的侵入。加厚棉紗布面柔軟透氣，每一次擦拭都能帶來如沐春風般的細膩感受。無論是午餐後的隨身清潔、鍵盤與桌面的輕度護理，還是旅途中的應急盥洗，它都能以最溫潤的方式，為您的每一個片刻賦予清爽與從容。",
-    "features": [
-      "99% 超純水配方，無酒精、無螢光劑、無防腐劑",
-      "加厚棉紗布面，柔韌耐用不易破損",
-      "獨立包裝有效鎖水，攜帶方便衛生無虞"
-    ],
-    "specifications": [
-      {
-        "label": "主成分",
-        "value": "純水 (RO 逆滲透過濾水) 99% 以上"
-      },
-      {
-        "label": "適用對象",
-        "value": "全年齡層適用，嬰兒級安全認證"
-      },
-      {
-        "label": "材質規格",
-        "value": "加厚棉紗布 / 無紡布複合纖維"
-      },
-      {
-        "label": "購買平台",
-        "value": "momo 購物網 (原廠正品授權)"
-      }
-    ],
-    "designer_critique": "看似最不起眼的日常消耗品，往往蘊藏著最深刻的生活哲思。這款純水濕紙巾用「減法」詮釋護膚——去除一切化學添加，只留下水的純粹本質。當你在滿載 deadline 的下午，輕輕撕開包裝，感受那片柔軟帶來的清爽一刻，便是在混亂都市中為自己開鑿的一片隱形綠洲。"
   }
 ];
