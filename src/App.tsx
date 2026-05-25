@@ -1036,9 +1036,9 @@ export default function App() {
     const nextIssueDate = getIssueDate(nextIssueNum);
 
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      const apiKey = localStorage.getItem('oasis_gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY;
       if (!apiKey || apiKey.trim() === '' || apiKey.startsWith('nvapi-')) {
-        throw new Error('API Key is missing or invalid. Please configure a valid VITE_GEMINI_API_KEY in .env.local.');
+        throw new Error('API Key is missing or invalid. Please configure a valid VITE_GEMINI_API_KEY in .env or local storage.');
       }
 
       await new Promise(resolve => setTimeout(resolve, 1800));
@@ -1655,9 +1655,9 @@ export const PRODUCTS: Product[] = ${JSON.stringify(targetProducts, null, 2)};
     }
     setIsAiAutoFilling(true);
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      const apiKey = localStorage.getItem('oasis_gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY;
       if (!apiKey || apiKey.trim() === '' || apiKey.startsWith('nvapi-')) {
-        throw new Error('請設定有效的 VITE_GEMINI_API_KEY 環境變數。');
+        throw new Error('請設定有效的 VITE_GEMINI_API_KEY 環境變數或瀏覽器 LocalStorage 中。');
       }
 
       const isUrl = /^https?:\/\//i.test(inputVal);
