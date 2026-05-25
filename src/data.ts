@@ -133,6 +133,21 @@ export const NEXT_ISSUE_STORIES: Story[] = [
 
 export const PRODUCTS: Product[] = [
   {
+    "id": "prod-custom-1779686889531",
+    "title_optimized": "DOSUN RT100 輕量電輔公路車：優雅馳騁，征服山海",
+    "price_display": "洽詢優惠",
+    "affiliate_url": "https://shopee.tw/DOSUN-RT100%E8%BC%95%E9%87%8F%E5%85%A8%E8%83%BD%E5%9E%8B-%E9%9B%BB%E8%BC%94%E5%85%AC%E8%B7%AF%E8%BB%8A-%E9%9B%BB%E5%8A%A9%E8%BB%8A-%E5%8A%A9%E5%8A%9B%E8%BB%8A-%E5%B4%87%E8%B6%8A%E5%96%AE%E8%BB%8A%E4%BC%91%E9%96%92%E9%A4%A8-i.267076615.22706590935?extraParams=%7B%22display_model_id%22%3A240553033257%7D",
+    "btn_text": "探索騎行樂趣",
+    "context_tags": [
+      "日常充電",
+      "極簡旅行"
+    ],
+    "status": "active",
+    "is_popular": true,
+    "image_url": "https://images.unsplash.com/photo-1596700870908-01111d4e0b0e?auto=format&fit=crop&w=600&q=80",
+    "description": "以公路車美學結合電力輔助，讓每一次騎行都輕盈而充滿力量，探索未曾想像的風景。"
+  },
+  {
     "id": "prod-01",
     "title_optimized": "無線桌上美學｜極簡磁吸三合一無線充電座",
     "price_display": "NT$ 2,480",
