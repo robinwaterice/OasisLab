@@ -18,7 +18,7 @@ export const STORIES: Story[] = [
 
 我們探訪了十位在京都、巴里島與清邁一邊漫遊一邊寫作的跨界創作者，為你篩選出這幾款能讓你在任何角落「迅速充電、隨時就位」的硬核美學裝備。`,
     targetTag: '日常充電',
-    coverImage: 'https://images.unsplash.com/photo-1585776245991-cf89dd7fc73a?auto=format&fit=crop&w=1200&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1585776245991-cf89dd7fc73a?auto=format&fit=crop&w=1920&q=100',
     author: '編輯部・Eli Lin',
     readTime: '4 Mins Read',
     date: 'ISSUE 025 // MAY 2026'
@@ -35,7 +35,7 @@ export const STORIES: Story[] = [
 
 這些並非無謂的消費，而是在高壓現實中，奪回生活微小控制權的「必要儀式」。用極簡的設計與人體工學，向不妥協的靈魂致敬。`,
     targetTag: '辦公室必備',
-    coverImage: 'https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?auto=format&fit=crop&w=1200&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?auto=format&fit=crop&w=1920&q=100',
     author: '策展人・Siri Chen',
     readTime: '5 Mins Read',
     date: 'ISSUE 025 // MAY 2026'
@@ -52,7 +52,7 @@ export const STORIES: Story[] = [
 
 當身上包袱回歸極簡，眼前的景色才真正開始清晰。精準的挑選，是為了展開一場無負擔的輕盈思維之旅。`,
     targetTag: '極簡旅行',
-    coverImage: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=1200&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=1920&q=100',
     author: '資深旅人・Homer Chang',
     readTime: '3 Mins Read',
     date: 'ISSUE 025 // MAY 2026'
@@ -72,7 +72,7 @@ export const HISTORICAL_STORIES: Story[] = [
 
 這是一份與自然共同生長的專注練習。為桌角添一盆苔球，讓每一口呼吸都多幾分森林般的潔淨與坦然。`,
     targetTag: '辦公室必備',
-    coverImage: 'https://images.unsplash.com/photo-1485955900006-10f4d324d411?auto=format&fit=crop&w=1200&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1485955900006-10f4d324d411?auto=format&fit=crop&w=1920&q=100',
     author: '植物引路人・Yara Lin',
     readTime: '5 Mins Read',
     date: 'ISSUE 024 // APR 2026'
@@ -89,7 +89,7 @@ export const HISTORICAL_STORIES: Story[] = [
 
 用天然物件的舊化（Aging），來對抗都市生活的折舊與磨損。這正是我們極力推薦的永續選物哲学。`,
     targetTag: '極簡旅行',
-    coverImage: 'https://images.unsplash.com/photo-1531346878377-a5be20888e57?auto=format&fit=crop&w=1200&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1531346878377-a5be20888e57?auto=format&fit=crop&w=1920&q=100',
     author: '工藝主編・Mao Wu',
     readTime: '3 Mins Read',
     date: 'ISSUE 024 // APR 2026'
@@ -106,7 +106,7 @@ export const HISTORICAL_STORIES: Story[] = [
 
 當晨間的意識有了這場洗禮，後續再密集的視訊會議、再複雜的報表，都無法輕易戳破這道由溫潤茶湯所編織的平靜護欄。`,
     targetTag: '日常充電',
-    coverImage: 'https://images.unsplash.com/photo-1545048702-79362596cdc9?auto=format&fit=crop&w=1200&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1545048702-79362596cdc9?auto=format&fit=crop&w=1920&q=100',
     author: '茶人・Ryu Shen',
     readTime: '4 Mins Read',
     date: 'ISSUE 023 // MAR 2026'
@@ -126,7 +126,7 @@ export const NEXT_ISSUE_STORIES: Story[] = [
 
 將所有的生存所需歸納在 40 公升之內，此即為走向浩瀚無垠大自然前的終極修行與最和諧的減法藝術。`,
     targetTag: '極簡旅行',
-    coverImage: 'https://images.unsplash.com/photo-1501555088652-021faa106b9b?auto=format&fit=crop&w=1200&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1501555088652-021faa106b9b?auto=format&fit=crop&w=1920&q=100',
     author: '徒步評論家・Kary Tseng',
     readTime: '4 Mins Read',
     date: 'ISSUE 026 // JUN 2026'
@@ -143,7 +143,7 @@ export const NEXT_ISSUE_STORIES: Story[] = [
 
 在工作與思辨的空檔中自然切换，重新釋放緊繃的腰肌，讓大腦重新浸潤在氧氣飽滿的流動靈感中。`,
     targetTag: '辦公室必備',
-    coverImage: 'https://images.unsplash.com/photo-1595515106969-1ce29566ff1c?auto=format&fit=crop&w=1200&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1595515106969-1ce29566ff1c?auto=format&fit=crop&w=1920&q=100',
     author: '人體工學主筆・Alan Ko',
     readTime: '3 Mins Read',
     date: 'ISSUE 026 // JUN 2026'
@@ -160,7 +160,7 @@ export const NEXT_ISSUE_STORIES: Story[] = [
 
 翻開一本微黃的實體舊書，伴隨木芯燃燒的清脆辟啪聲，讓日常所受的浮躁與委屈悉數在暖白芬芳中和煦消散。`,
     targetTag: '日常充電',
-    coverImage: 'https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=1200&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=1920&q=100',
     author: '香氛調香師・Joanna Xu',
     readTime: '5 Mins Read',
     date: 'ISSUE 026 // JUN 2026'
@@ -176,7 +176,7 @@ export const PRODUCTS: Product[] = [
     btn_text: '探索生活靈感',
     context_tags: ['日常充電', '辦公室必備'],
     status: 'active',
-    image_url: 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=600&q=80',
+    image_url: 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=1080&q=100',
     description: '懸浮磁吸設計，告別凌亂線材，為 iPhone、Apple Watch 與 AirPods 同時注入飽滿的桌面能量。',
     story_behind: '在無線化桌面的演進中，這款三合一充電座將物理線材隱匿於無形。採用溫潤的陽極氧化鋁合金結合親膚矽膠，頂部以懸浮式磁吸結構將 iPhone 優雅支撐，使手機在充電時化身為案頭的極簡時鐘。底座則巧妙融入凹面羊毛氈質感，專為 AirPods 預留歸屬，實現了功能、材質與桌案空間的最佳視覺平衡。',
     features: ['全懸浮 MagSafe 磁吸快充', '噴砂陽極氧化鋁合金中框', '底部防滑配重與親膚超纖皮'],
@@ -196,7 +196,7 @@ export const PRODUCTS: Product[] = [
     btn_text: '入手差旅伴侶',
     context_tags: ['極簡旅行'],
     status: 'active',
-    image_url: 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=600&q=80',
+    image_url: 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=1080&q=100',
     description: '僅 1.6mm 極致厚度，可輕鬆置於皮夾與護照套內。強大全球定位網絡讓你的珍貴物件永不離線。',
     story_behind: '對於漫遊在不同城市的旅人而言，安心感是無價的奢華。這款定位卡片將強大的 Apple Find My 全球定位技術壓縮至僅 1.6mm 的極致厚度。它可以無感地滑入任何一張植鞣皮革夾、護照套或名片夾中。外殼由高強度鋼化玻璃纖維與啞光金屬框架製成，防刮耐磨，默默地在喧囂的候機室或陌生的旅店中，為您的隨身物件提供不具侵入性的隱形守護。',
     features: ['1.6mm 極致超薄卡片設計', '全球 Apple Find My 網絡精準定位', 'IP67 級防塵防水與長效 3 年續航'],
@@ -216,7 +216,7 @@ export const PRODUCTS: Product[] = [
     btn_text: '開啟專注晨光',
     context_tags: ['日常充電', '辦公室必備'],
     status: 'active',
-    image_url: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=600&q=80',
+    image_url: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1080&q=100',
     description: '由有田燒職人純手工打造，多肋紋內部引流結構，精準控制萃取時流速，澄淨每一口咖啡的感官。',
     story_behind: '晨光微熹，用一注溫水喚醒咖啡的香氣，是創造者進入專注心流的必經儀式。這款濾杯禮盒來自日本手作瓷器之鄉有田町，由擁有四十年經驗的職人手工拉胚與燒製。經典的 V60 錐形結構，搭配精心計算的角度與內部深邃的螺旋肋紋，使水流速度與萃取率達到完美的平衡，溫柔濾除所有雜味，留下最純淨明亮的花果感香氣。',
     features: ['日本佐賀縣有田燒職人純手工燒製', '專利螺旋引流肋紋設計，防萃取過度', '隨附胡桃木隔熱杯托與高硼矽玻璃分享壺'],
@@ -236,7 +236,7 @@ export const PRODUCTS: Product[] = [
     btn_text: '舒緩緊繃腰背',
     context_tags: ['辦公室必備'],
     status: 'active',
-    image_url: 'https://images.unsplash.com/photo-1580481072645-022f9a6dbf27?auto=format&fit=crop&w=600&q=80',
+    image_url: 'https://images.unsplash.com/photo-1580481072645-022f9a6dbf27?auto=format&fit=crop&w=1080&q=100',
     description: '環抱式仿生曲面結構，3D 高回彈記憶棉，完美填補久坐時的腰椎空隙，分散脊椎底部的沉重壓力。',
     story_behind: '長時間專注於螢幕前，腰椎所承受的沉重壓力常常在無形中消磨著創造力。這款護腰墊採用仿生曲面結構，模擬雙手環抱脊椎的包覆感。內芯為高密度、慢回彈的 3D 記憶棉，能隨體溫與坐姿自動塑形，精準填補尾椎與椅背之間的空隙。外層使用特製的雙層蜂巢透氣網布，確保即使在悶熱的夏季午後，依然能保持乾爽，讓您的背部得到最溫柔可靠的物理支撐。',
     features: ['3D 仿生雙翼環抱設計，釋放脊椎壓力', 'BASF 高回彈記憶棉，長久使用不塌陷', '超透氣蜂巢空氣網布，可拆卸水洗'],
@@ -256,7 +256,7 @@ export const PRODUCTS: Product[] = [
     btn_text: '輕裝奔向遠方',
     context_tags: ['極簡旅行', '日常充電'],
     status: 'active',
-    image_url: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=600&q=80',
+    image_url: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=1080&q=100',
     description: 'Cordura 防潑水耐磨面料，內置獨立 16 吋筆電防震層與快充線路穿孔，實踐最高度的移動美學。',
     story_behind: '在穿梭於高鐵、候機室與共同工作空間的旅途中，一款全能且體面的背包是漫遊者的靈魂配件。這款雙肩包選用傳奇級 Cordura® 防撕裂防潑水面料，外觀呈現霧面極簡線條，無任何贅餘口袋。內部則規劃了精密的多維收納系統，包含獨立的 16 吋加厚筆電防震層、快取感應卡槽，以及巧妙隱匿的 Type-C 快充穿孔，完美調和了「都會通勤」與「輕裝遠行」的雙重需求。',
     features: ['頂級 Cordura® 1050D 彈道尼龍，極致耐磨防雨', '後背隱密行李箱固定帶與防盜磁吸暗袋', 'Ergo-Flex 立體減壓背負系統，分散肩部重量'],
@@ -276,7 +276,7 @@ export const PRODUCTS: Product[] = [
     btn_text: '感觸溫度細節',
     context_tags: ['日常充電', '極簡旅行'],
     status: 'active',
-    image_url: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=600&q=80',
+    image_url: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=1080&q=100',
     description: '雙層高效真空保溫，附有極簡式 LCD 感應式外蓋，讓你隨時調控日常補水，每一口皆是最純粹的溫度。',
     story_behind: '水是流動的生命，而合適的溫度則決定了每一口飲水的感官體驗。這款保溫瓶設計靈感源自東方瓦片的層疊美學，瓶身表面以細緻的霧面防指紋烤漆覆蓋，帶來如陶土般溫潤的微摩擦觸感。瓶蓋頂端鑲嵌了一塊低功耗 LCD 觸控感應螢幕，只需輕觸便能即時讀取瓶內水溫，避免燙傷；雙層高真空不鏽鋼層，更能在極寒或酷暑下長效鎖溫。',
     features: ['微功耗 LCD 觸控瓶蓋，感應即時水溫', '醫療級 316 雙層真空不鏽鋼，無味易清潔', '長效 24 小時保冷、12 小時保溫技術'],
@@ -296,7 +296,7 @@ export const PRODUCTS: Product[] = [
     btn_text: '升華案頭觸摸',
     context_tags: ['辦公室必備'],
     status: 'active',
-    image_url: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=600&q=80',
+    image_url: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1080&q=100',
     description: '採用天然美麗諾精紡羊毛氈，搭配抗滑天然栓木大底，溫潤軟熟的壓感，為長時打字的手術臂建立舒緩緩衝。',
     story_behind: '桌面是創造力流淌的平原。這款電腦墊選用來自澳洲的高級美麗諾精紡羊毛，經過多次熱壓壓實，帶來厚實而細膩的天然壓感，能有效減輕手腕在長時間打字時與硬質桌面的摩擦。底層則貼心地結合了天然橡木皮與止滑橡膠，在保護桌面的同時，提供了絕佳的防滑穩定性能，用天然纖維的溫潤，為您日復一日的鍵盤工作編織一條無干擾的物理緩衝帶。',
     features: ['100% 澳洲進口美麗諾天然羊毛氈，不起毛球', '天然碳化橡木防滑底板，極致貼合不滑動', '5mm 加厚減壓結構，吸音減震效果顯著'],
@@ -316,7 +316,7 @@ export const PRODUCTS: Product[] = [
     btn_text: '遮蔽都市塵囂',
     context_tags: ['日常充電', '極簡旅行', '辦公室必備'],
     status: 'active',
-    image_url: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=600&q=80',
+    image_url: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=1080&q=100',
     description: '45dB 精準感知智慧調頻降噪，搭配低共振複合振膜，在任何咖啡廳或喧囂的車廂內，均能為您保留那份靈感淨土。',
     story_behind: '在人聲嘈雜的城市中，安靜已成為最奢侈的渴望。這款真無線耳機採用了高規主動式降噪技術，能精準過濾咖啡廳與捷運車廂內的低頻噪音。耳機外觀以簡約圓潤的鵝卵石為設計語彙，外殼採用磨砂與拋光異材質拼接。內部搭載 10mm 複合生物振膜，在呈現下潛極深的醇厚低音之餘，亦保留了乾淨透明的文藝聲線，讓您隨時隨地開啟專屬的精神綠洲。',
     features: ['-45dB 智慧感知降噪，多場景無感切換', '10mm 生物纖維複合振膜，Hi-Res 原音重現', '搭配充電盒可達 30 小時長效續航與極速快充'],
@@ -336,7 +336,7 @@ export const PRODUCTS: Product[] = [
     btn_text: '前往 momo 選購',
     context_tags: ['辦公室必備', '日常充電'],
     status: 'active',
-    image_url: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=600&q=80',
+    image_url: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=1080&q=100',
     description: '99% 純水配方，不含酒精與螢光劑，以嬰兒等級的溫柔標準，守護每一次日常肌膚的輕盈接觸。',
     story_behind: '在快節奏的辦公室生活中，雙手的清潔往往被遺忘在一杯咖啡與一場視訊會議之間。這款純水濕紙巾以近乎清水的配方出發，嚴格遵循嬰兒肌膚標準研製，拒絕任何化學添加的侵入。加厚棉紗布面柔軟透氣，每一次擦拭都能帶來如沐春風般的細膩感受。無論是午餐後的隨身清潔、鍵盤與桌面的輕度護理，還是旅途中的應急盥洗，它都能以最溫潤的方式，為您的每一個片刻賦予清爽與從容。',
     features: ['99% 超純水配方，無酒精、無螢光劑、無防腐劑', '加厚棉紗布面，柔韌耐用不易破損', '獨立包裝有效鎖水，攜帶方便衛生無虞'],

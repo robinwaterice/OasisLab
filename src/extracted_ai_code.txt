@@ -1,0 +1,57 @@
+
+============================================================
+STEP 165: "Implement handleAiAutoFillProduct function"
+============================================================
+"  // 分享故事專屬連結功能\n  const handleShareStory = (storyTitle: string) => {\n    try {\n      navigator.clipboard.writeText(window.location.href);\n      setCopiedLink(true);\n      triggerToast(`🔗 專題《${storyTitle}》的連結已複製！`);\n      setTimeout(() => setCopiedLink(false), 2000);\n    } catch (e) {\n      triggerToast('⚠️ 複製連結失敗，請手動複製瀏覽器網址。');\n    }\n  };\n\n  // 商品內容即時編輯台 - 一鍵 AI 自動上架 / 填寫功能\n  const handleAiAutoFillProduct = async () => {\n    if (!editProductTitle.trim()) {\n      triggerToast('⚠️ 請先輸入「商品優化標題」或基本的商品名稱，以便 AI 進行深度策展設計！');\n      return;\n    }\n\n    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;\n    if (!apiKey || apiKey.trim() === '' || apiKey.startsWith('nvapi-')) {\n      triggerToast('⚠️ 系統尚未配置有效的 VITE_GEMINI_API_KEY，請確認您的環境變數。');\n      return;\n    }\n\n    setIsGeneratingProduct(true);\n    triggerToast('🧠 AI 智理編輯正在為您構思精美文案、挑選視覺配圖與設計極簡工藝參數...');\n\n    try {\n      const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;\n      const systemInstructions = `你是一位 Oasis Lab. 的頂級選物美學總編輯與生活器物評誌專家。\n請依據使用者輸入的商品名稱/標題，為其生成符合 Oasis Lab. 極簡溫潤、高品質慢活美學的完整商品詳細資料。\n\n你必須回傳一個符合以下 JSON 格式的物件，請不要有任何額外的 markdown 包裹（只需回傳純 JSON 字串）：\n{\n  \"title_optimized\": \"優化後富有人文溫度與工藝感的標題 (例如：極簡實木耳機支架、多功能降噪旅行包)\",\n  \"price_display\": \"富有一流生活儀式感的價格格式 (例如：NT$ 1,980 或 NT$ 3,450 / 限時優惠)\",\n  \"btn_text\": \"富有人文吸引力的導購
+<truncated 5158 bytes>
+
+============================================================
+STEP 227: "Implement intelligent URL decoding and search grounding in handleAiAutoFillProduct"
+============================================================
+"  // 商品內容即時編輯台 - 一鍵 AI 自動上架 / 填寫功能\n  const handleAiAutoFillProduct = async () => {\n    const inputTitle = editProductTitle.trim();\n    const inputUrl = editProductUrl.trim();\n\n    if (!inputTitle && !inputUrl) {\n      triggerToast('⚠️ 請先輸入「商品名稱」或貼上「聯盟行銷網址」，以供 AI 進行智慧辨識與生成！');\n      return;\n    }\n\n    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;\n    if (!apiKey || apiKey.trim() === '' || apiKey.startsWith('nvapi-')) {\n      triggerToast('⚠️ 系統尚未配置有效的 VITE_GEMINI_API_KEY，請確認您的環境變數。');\n      return;\n    }\n\n    setIsGeneratingProduct(true);\n    triggerToast('🧠 AI 智理編輯正在啟動網頁分析與 Google 搜尋，為您分析單品並撰寫美學文案...');\n\n    // 輔助函數：判斷是否為 URL\n    const isUrl = (str: string) => {\n      try {\n        return str.startsWith('http://') || str.startsWith('https://');\n      } catch (e) {\n        return false;\n      }\n    };\n\n    let targetTitle = inputTitle;\n    let targetUrl = inputUrl;\n\n    // 若使用者誤將 URL 填入標題欄位，自動修正\n    if (isUrl(inputTitle)) {\n      targetUrl = inputTitle;\n      setEditProductUrl(inputTitle);\n      targetTitle = '';\n      setEditProductTitle('');\n    }\n\n    // 💡 蝦皮 URL 深度智慧優化：從網址路徑中自動解碼並提取中文關鍵字，作為強大底線防禦 (Fallback)\n    let urlKeywordHint = \"\";\n    if (targetUrl) {\n      try {\n        const decoded = decodeURIComponent(targetUrl);\n        const urlObj = new URL(decoded);\n        \n        // 抓取路徑名稱 (例: /【現貨】Keychron-K3-機械鍵盤-i.4439063...)\n        const pathname = urlObj.pathname;\n        const segments = pathname.split('/').flatMap(s => s.split('-')).filter(s => {\n          // 過濾無關的 ID 數字及過短的字串\n          return s && s.length > 1 && !/^\\d+$/.test(s) && !s.includes('produ
+<truncated 8155 bytes>
+
+============================================================
+STEP 257: "Change product autofill response type to text/plain and parse markdown JSON block"
+============================================================
+"                            你必須回傳一個符合以下 JSON 格式的物件，請務必將輸出內容包裹在 \\`\\`\\`json 和 \\`\\`\\` 之間：\n{\n  \"title_optimized\": \"優化後富有人文溫度與工藝感的標題 (例如：極簡實木耳機支架、多功能降噪旅行包)\",\n  \"price_display\": \"富有一流生活儀式感的價格格式 (例如：NT$ 1,980 或 NT$ 3,450 / 限時優惠)\",\n  \"btn_text\": \"富有人文吸引力的導購按鈕文字 (例如：探索生活靈感、前往選購、品味日常)\",\n  \"description\": \"一句話商品核心特點與美學亮點描述，約35字 (例如：以壓克力結合溫潤胡桃木，為案頭整理開闢極簡秩序。)\",\n  \"context_tags\": [\"兩個到三個相關的美學分類標籤，只能從日常充電、辦公室必備、極簡旅行中挑選\"],\n  \"image_url\": \"依據商品屬性，從下方給定的真實高品質 Unsplash 網址中精準挑選最符合的一個，切勿自行編造：\n    - 三合一充電/數位產品/充電器: https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=600&q=80\n    - 機械鍵盤/升降桌/辦公桌搭/滑鼠/工作空間: https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=600&q=80\n    - 背包/雙肩包/收納包/出遊隨行包: https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=600&q=80\n    - 手沖咖啡壺/慢活杯盞/保溫杯/茶具: https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=600&q=80\n    - 日常卡夾/皮革錢包/收納卡盒/小品件: https://images.unsplash.com/photo-1627124156689-d437fef4544d?auto=format&fit=crop&w=600&q=80\n    - 香氛蠟燭/空間噴霧/慢活居家空間: https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=600&q=80\",\n  \"story_behind\": \"約150-200字，語氣溫潤優雅的設計理念人文故事。闡述商品如何解決都市生活的混亂並重拾美學專注。\",\n  
+<truncated 2871 bytes>
+
+============================================================
+STEP 262: "Cleanly parse JSON from markdown code block in handleAiAutoFillProduct"
+============================================================
+      const parsed = (() => {
+        let jsonStr = rawText.trim();
+        const matches = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (matches && matches[1]) {
+          jsonStr = matches[1].trim();
+        }
+        return JSON.parse(jsonStr);
+      })();
+
+============================================================
+STEP 286: "Bypass safety/recitation blocks and add detailed error logging in handleAiAutoFillProduct"
+============================================================
+"  // 商品內容即時編輯台 - 一鍵 AI 自動上架 / 填寫功能\n  const handleAiAutoFillProduct = async () => {\n    const inputTitle = editProductTitle.trim();\n    const inputUrl = editProductUrl.trim();\n\n    if (!inputTitle && !inputUrl) {\n      triggerToast('⚠️ 請先輸入「商品名稱」或貼上「聯盟行銷網址」，以供 AI 進行智慧辨識與生成！');\n      return;\n    }\n\n    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;\n    if (!apiKey || apiKey.trim() === '' || apiKey.startsWith('nvapi-')) {\n      triggerToast('⚠️ 系統尚未配置有效的 VITE_GEMINI_API_KEY，請確認您的環境變數。');\n      return;\n    }\n\n    setIsGeneratingProduct(true);\n    triggerToast('🧠 AI 智理編輯正在啟動網頁分析與 Google 搜尋，為您分析單品並撰寫美學文案...');\n\n    // 輔助函數：判斷是否為 URL\n    const isUrl = (str: string) => {\n      try {\n        return str.startsWith('http://') || str.startsWith('https://');\n      } catch (e) {\n        return false;\n      }\n    };\n\n    let targetTitle = inputTitle;\n    let targetUrl = inputUrl;\n\n    // 若使用者誤將 URL 填入標題欄位，自動修正\n    if (isUrl(inputTitle)) {\n      targetUrl = inputTitle;\n      setEditProductUrl(inputTitle);\n      targetTitle = '';\n      setEditProductTitle('');\n    }\n\n    // 💡 蝦皮 URL 深度智慧優化：從網址路徑中自動解碼並提取中文關鍵字，作為強大底線防禦 (Fallback)\n    let urlKeywordHint = \"\";\n    if (targetUrl) {\n      try {\n        const decoded = decodeURIComponent(targetUrl);\n        const urlObj = new URL(decoded);\n        \n        // 抓取路徑名稱 (例: /【現貨】Keychron-K3-機械鍵盤-i.4439063...)\n        const pathname = urlObj.pathname;\n        const segments = pathname.split('/').flatMap(s => s.split('-')).filter(s => {\n          // 過濾無關的 ID 數字及過短的字串\n          return s && s.length > 1 && !/^\\d+$/.test(s) && !s.includes('produ
+<truncated 7694 bytes>
+
+============================================================
+STEP 337: "Fix Gemini API response parts search logic to look up the text part dynamically, resolving the STOP finishing reason parsing error."
+============================================================
+      const candidate = resData.candidates?.[0];
+      const parts = candidate?.content?.parts || [];
+      const textPart = parts.find((p: any) => p.text);
+      const rawText = textPart?.text;
+      
+      if (!rawText) {
+        const finishReason = candidate?.finishReason || 'UNKNOWN';
+        let errMsg = `無法從 Gemini 回傳中取得有效生成的商品內容 (原因: ${finishReason})`;
+        if (finishReason === 'SAFETY') {
+          errMsg = '⚠️ 觸發了安全防禦過濾器 (SAFETY)。請嘗試稍微簡化或修改商品名稱後重試。';
+        } else if (finishReason === 'RECITATION') {
+          errMsg = '⚠️ 觸發了原創重述保護過濾器 (RECITATION)。已自動為您優化以防抄襲阻擋，請再次點擊重試。';
+        } else if (resData.promptFeedback?.blockReason) {
+          errMsg = `⚠️ 提示詞被阻擋 (原因: ${resData.promptFeedback.blockReason})`;
+        }
+        throw new Error(errMsg);
+      }

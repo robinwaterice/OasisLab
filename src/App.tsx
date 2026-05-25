@@ -52,6 +52,9 @@ import {
 } from 'lucide-react';
 import { Story, Product } from './types';
 import { STORIES, HISTORICAL_STORIES, NEXT_ISSUE_STORIES, PRODUCTS } from './data';
+import CropModal from './components/CropModal';
+import KeywordModal from './components/KeywordModal';
+import InstagramPostPreviewer from './components/InstagramPostPreviewer';
 
 // ================== 【可拖曳排序商品列 - 獨立子元件】 ==================
 interface SortableProductRowProps {
@@ -128,6 +131,34 @@ function SortableProductRow({
   );
 }
 
+// 慢活品牌美學 - 分類高畫質 Unsplash 備份封面圖列表
+const getFallbackImage = (tag: string, index: number = 0): string => {
+  const chargers = [
+    'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1507133750040-4a8f57021571?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1499209974431-9dddcece7f88?auto=format&fit=crop&w=1200&q=80'
+  ];
+  const offices = [
+    'https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1585776245991-cf89dd7fc73a?auto=format&fit=crop&w=1200&q=80'
+  ];
+  const travels = [
+    'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1501555088652-021faa106b9b?auto=format&fit=crop&w=1200&q=80',
+    'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&w=1200&q=80'
+  ];
+
+  const tagClean = tag || '';
+  let list = chargers;
+  if (tagClean.includes('辦公') || tagClean.toLowerCase().includes('office')) {
+    list = offices;
+  } else if (tagClean.includes('旅行') || tagClean.toLowerCase().includes('travel')) {
+    list = travels;
+  }
+  return list[Math.abs(index) % list.length];
+};
+
 export default function App() {
   // 狀態管理：目前所在的頁面。'cover' 代表封面首頁，story 的 id 代表具體專體內頁
   const [currentView, setCurrentView] = useState<string>('cover');
@@ -163,6 +194,11 @@ export default function App() {
   const [adminUsername, setAdminUsername] = useState<string>('');
   const [adminPassword, setAdminPassword] = useState<string>('');
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(false);
+  const [adminActiveTab, setAdminActiveTab] = useState<'stories' | 'products' | 'stats'>('stories');
+
+  // 一鍵 AI 自動上架商品
+  const [aiAutoFillInput, setAiAutoFillInput] = useState<string>('');
+  const [isAiAutoFilling, setIsAiAutoFilling] = useState<boolean>(false);
 
   // AI 策展期刊生成狀態
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -180,6 +216,17 @@ export default function App() {
   const [editTitle, setEditTitle] = useState<string>('');
   const [editDescription, setEditDescription] = useState<string>('');
   const [editContent, setEditContent] = useState<string>('');
+  const [editCoverImage, setEditCoverImage] = useState<string>('');
+  const [storyUrlInput, setStoryUrlInput] = useState<string>('');
+
+  // 內建自訂 3:2 裁切器狀態
+  const [showCropModal, setShowCropModal] = useState<boolean>(false);
+  const [cropSrc, setCropSrc] = useState<string>('');
+  const [cropZoom, setCropZoom] = useState<number>(1.0);
+  const [cropPanX, setCropPanX] = useState<number>(0);
+  const [cropPanY, setCropPanY] = useState<number>(0);
+  const [isDraggingCrop, setIsDraggingCrop] = useState<boolean>(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // 後台 Shop 商品管理狀態
   const [editableProducts, setEditableProducts] = useState<Product[]>(() => {
@@ -231,25 +278,70 @@ export default function App() {
     return `ISSUE ${padNum} // ${months[monthIndex]} ${year}`;
   };
 
-  // 隨機偏移量（使顯示點擊數穩定且隨機，不會隨畫面重繪而頻繁亂跳）
+  // 隨機偏移量（使顯示點擊數穩定且隨機，不會隨畫面重繪而頻繁亂跳，且持久化保存）
   const [storyOffsets, setStoryOffsets] = useState<{[key: string]: number}>(() => {
+    try {
+      const saved = localStorage.getItem('oasis_story_offsets_v2');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    
     const offsets: {[key: string]: number} = {};
-    const all = [...STORIES, ...HISTORICAL_STORIES, ...NEXT_ISSUE_STORIES];
-    all.forEach(s => {
-      // 隨機 800 - 1999 數字
-      offsets[s.id] = Math.floor(Math.random() * 1200) + 800;
+    const allS = (() => {
+      try {
+        const savedActive = localStorage.getItem('oasis_active_stories_v1');
+        const savedArchived = localStorage.getItem('oasis_archived_stories_v1');
+        let combined = [...STORIES, ...HISTORICAL_STORIES, ...NEXT_ISSUE_STORIES];
+        if (savedActive) combined = combined.concat(JSON.parse(savedActive) as Story[]);
+        if (savedArchived) combined = combined.concat(JSON.parse(savedArchived) as Story[]);
+        return combined;
+      } catch (e) {
+        return [...STORIES, ...HISTORICAL_STORIES, ...NEXT_ISSUE_STORIES];
+      }
+    })();
+    
+    allS.forEach(s => {
+      if (!offsets[s.id]) {
+        offsets[s.id] = Math.floor(Math.random() * 1200) + 800;
+      }
     });
     return offsets;
   });
 
   const [productOffsets, setProductOffsets] = useState<{[key: string]: number}>(() => {
+    try {
+      const saved = localStorage.getItem('oasis_product_offsets_v2');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    
     const offsets: {[key: string]: number} = {};
-    PRODUCTS.forEach(p => {
-      // 隨機 500 - 999 數字
-      offsets[p.id] = Math.floor(Math.random() * 500) + 500;
+    // 使用儲存的商品列表（含用戶自訂商品）初始化偏移量
+    const savedProducts = (() => {
+      try {
+        const saved = localStorage.getItem('oasis_editable_products_v1');
+        if (saved) return JSON.parse(saved) as {id: string}[];
+      } catch (e) {}
+      return PRODUCTS;
+    })();
+    savedProducts.forEach(p => {
+      if (!offsets[p.id]) {
+        offsets[p.id] = Math.floor(Math.random() * 500) + 500;
+      }
     });
     return offsets;
   });
+
+  // 持久化保存偏移量
+  useEffect(() => {
+    try {
+      localStorage.setItem('oasis_story_offsets_v2', JSON.stringify(storyOffsets));
+    } catch (e) {}
+  }, [storyOffsets]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('oasis_product_offsets_v2', JSON.stringify(productOffsets));
+    } catch (e) {}
+  }, [productOffsets]);
 
   // 實際點擊數/查看數統計 (從 localStorage 獲取或預設為一些初始演示數據)
   const [storyClicks, setStoryClicks] = useState<{[key: string]: number}>(() => {
@@ -292,6 +384,13 @@ export default function App() {
     } catch (e) {}
   }, [productClicks]);
 
+  // 持久化 currentIssueNumber
+  useEffect(() => {
+    try {
+      localStorage.setItem('oasis_issue_number_v1', currentIssueNumber.toString());
+    } catch (e) {}
+  }, [currentIssueNumber]);
+
   // 💾 持久化儲存：AI 生成的專題與期數，避免重整後消失
   useEffect(() => {
     try {
@@ -333,6 +432,472 @@ export default function App() {
       [product.id]: (prev[product.id] || 0) + 1
     }));
     setSelectedProductDetail(product);
+  };
+
+  // 商品即時編輯表單之輔助函數
+  const renderProductEditForm = (isNew: boolean = false) => {
+    return (
+      <div className="border border-[#2C2C2A]/10 bg-[#F4F4F3]/40 rounded-xl p-5 md:p-6 mt-3 mb-4 space-y-5 font-sans-ui text-xs text-[#2C2C2A]/80 shadow-[inset_0_2px_8px_rgba(0,0,0,0.02)]">
+        <h4 className="text-xs font-mono-data text-[#2C2C2A]/50 font-bold tracking-wider uppercase flex items-center justify-between">
+          <span className="flex items-center space-x-2">
+            {isNew ? <PlusCircle className="w-3.5 h-3.5 text-[#5A6351]" /> : <Edit3 className="w-3.5 h-3.5 text-[#5A6351]" />}
+            <span>{isNew ? 'New Product — 新增商品資料' : 'Step 2 — 編輯商品內容欄位'}</span>
+          </span>
+        </h4>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="md:col-span-2">
+            <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">商品優化標題</label>
+            <input
+              type="text"
+              value={editProductTitle}
+              onChange={(e) => setEditProductTitle(e.target.value)}
+              placeholder="商品的完整優化標題"
+              className="w-full bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-serif font-bold text-sm transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">價格顯示文字</label>
+            <input
+              type="text"
+              value={editProductPrice}
+              onChange={(e) => setEditProductPrice(e.target.value)}
+              placeholder="例：NT$ 1,980 或 洽詢優惠"
+              className="w-full bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-mono-data transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">導購按鈕文字</label>
+            <input
+              type="text"
+              value={editProductBtnText}
+              onChange={(e) => setEditProductBtnText(e.target.value)}
+              placeholder="例：探索生活靈感、前往選購"
+              className="w-full bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui transition-all"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2 flex items-center space-x-1.5">
+              <Link className="w-3 h-3 text-[#2C2C2A]/40" />
+              <span>聯盟行銷 / 購買連結 (Affiliate URL)</span>
+            </label>
+            <input
+              type="url"
+              value={editProductUrl}
+              onChange={(e) => setEditProductUrl(e.target.value)}
+              placeholder="https://www.momoshop.com.tw/..."
+              className="w-full bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-mono-data transition-all"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">商品圖片 URL</label>
+            <div className="flex gap-3">
+              <input
+                type="url"
+                value={editProductImageUrl}
+                onChange={(e) => setEditProductImageUrl(e.target.value)}
+                placeholder="https://images.unsplash.com/..."
+                className="flex-1 bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-mono-data transition-all"
+              />
+              {editProductImageUrl && (
+                <div className="w-14 h-14 rounded-lg overflow-hidden border border-[#2C2C2A]/10 flex-shrink-0">
+                  <img src={editProductImageUrl} alt="預覽" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                </div>
+              )}
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">分類標籤 (逗號分隔)</label>
+            <input
+              type="text"
+              value={editProductTags}
+              onChange={(e) => setEditProductTags(e.target.value)}
+              placeholder="日常充電, 辦公室必備, 極簡旅行"
+              className="w-full bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui transition-all"
+            />
+            <p className="text-[10px] text-[#2C2C2A]/40 font-sans-ui mt-1">可用值：日常充電 / 辦公室必備 / 極簡旅行</p>
+          </div>
+          <div>
+            <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">商品上架狀態</label>
+            <div className="flex gap-2">
+              {(['active', 'pending', 'draft'] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setEditProductStatus(s)}
+                  className={`flex-1 px-3 py-2.5 rounded-lg text-xs font-sans-ui font-bold border transition-all cursor-pointer ${
+                    editProductStatus === s
+                      ? s === 'active' ? 'bg-emerald-500 text-white border-emerald-500'
+                        : s === 'pending' ? 'bg-amber-400 text-white border-amber-400'
+                        : 'bg-gray-400 text-white border-gray-400'
+                      : 'bg-white text-[#2C2C2A]/60 border-[#2C2C2A]/10 hover:bg-[#2C2C2A]/5'
+                  }`}
+                >
+                  {s === 'active' ? '🟢 上架' : s === 'pending' ? '🟡 待審' : '⚫ 草稿'}
+                </button>
+              ))}
+            </div>
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => setEditProductIsPopular(!editProductIsPopular)}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all cursor-pointer ${
+                  editProductIsPopular
+                    ? 'bg-amber-50 border-amber-300 text-amber-700'
+                    : 'bg-white border-[#2C2C2A]/10 text-[#2C2C2A]/50 hover:border-[#2C2C2A]/20'
+                }`}
+              >
+                <div className="flex items-center space-x-2.5">
+                  <Star className={`w-4 h-4 ${editProductIsPopular ? 'text-amber-400 fill-amber-400' : 'text-[#2C2C2A]/30'}`} />
+                  <div className="text-left">
+                    <p className="text-xs font-sans-ui font-bold">人氣精選 Popular Pick</p>
+                    <p className="text-[10px] font-sans-ui opacity-70">影響前台商品卡片顯示金色徽章</p>
+                  </div>
+                </div>
+                <div className={`w-10 h-5 rounded-full transition-all relative ${editProductIsPopular ? 'bg-amber-400' : 'bg-[#2C2C2A]/15'}`}>
+                  <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${editProductIsPopular ? 'left-5.5' : 'left-0.5'}`} />
+                </div>
+              </button>
+            </div>
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">商品一句話特點描述</label>
+            <textarea
+              rows={3}
+              value={editProductDescription}
+              onChange={(e) => setEditProductDescription(e.target.value)}
+              placeholder="簡明扼要地描述此商品最核心的功能亮點與適用族群..."
+              className="w-full bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui leading-relaxed transition-all resize-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 pt-3 border-t border-[#2C2C2A]/8">
+          <button
+            type="button"
+            onClick={() => {
+              if (isNew) {
+                const newId = `prod-custom-${Date.now()}`;
+                const newProduct: Product = {
+                  id: newId,
+                  title_optimized: editProductTitle || '新商品',
+                  price_display: editProductPrice || 'NT$ 0',
+                  affiliate_url: editProductUrl || '#',
+                  btn_text: editProductBtnText || '查看商品',
+                  context_tags: editProductTags.split(',').map(t => t.trim()).filter(Boolean),
+                  status: editProductStatus,
+                  is_popular: editProductIsPopular,
+                  image_url: editProductImageUrl || 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=600&q=80',
+                  description: editProductDescription || ''
+                };
+                const next = [newProduct, ...editableProducts];
+                setEditableProducts(next);
+                try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(next)); } catch(e) {}
+                setProductOffsets(prev => ({
+                  ...prev,
+                  [newId]: Math.floor(Math.random() * 500) + 500
+                }));
+                setProductClicks(prev => ({
+                  ...prev,
+                  [newId]: prev[newId] ?? 0
+                }));
+                setSelectedEditProductId(newId);
+                triggerToast(`🎉 新商品《${(editProductTitle || '新商品').slice(0,15)}》已成功新增並上架至前台 Shop！`);
+              } else {
+                const updatedProducts = editableProducts.map(p => {
+                  if (p.id !== selectedEditProductId) return p;
+                  return {
+                    ...p,
+                    title_optimized: editProductTitle,
+                    price_display: editProductPrice,
+                    affiliate_url: editProductUrl,
+                    btn_text: editProductBtnText,
+                    description: editProductDescription,
+                    image_url: editProductImageUrl,
+                    context_tags: editProductTags.split(',').map(t => t.trim()).filter(Boolean),
+                    status: editProductStatus,
+                    is_popular: editProductIsPopular
+                  };
+                });
+                setEditableProducts(updatedProducts);
+                try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(updatedProducts)); } catch(e) {}
+                triggerToast(`✨ 商品《${editProductTitle.slice(0, 15)}...》已成功更新並即時同步至前台！`);
+              }
+            }}
+            className="flex-1 sm:flex-initial bg-[#5A6351] hover:bg-[#4E5646] text-white font-sans-ui text-xs font-bold py-3 px-6 rounded-lg cursor-pointer transition-all flex items-center justify-center space-x-2 shadow-md hover:shadow-lg"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            <span>{isNew ? '建立並上架新商品' : '儲存並發布此商品變更'}</span>
+          </button>
+          {!isNew && (
+            <button
+              type="button"
+              onClick={() => {
+                if (confirmDeleteProductId === selectedEditProductId) {
+                  const next = editableProducts.filter(p => p.id !== selectedEditProductId);
+                  setEditableProducts(next);
+                  try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(next)); } catch(e) {}
+                  setSelectedEditProductId('');
+                  setConfirmDeleteProductId('');
+                  triggerToast(`🗑️ 商品《${editProductTitle.slice(0,12)}...》已刪除，前台即時同步移除。`);
+                } else {
+                  setConfirmDeleteProductId(selectedEditProductId);
+                }
+              }}
+              className={`px-5 py-3 text-xs font-sans-ui font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
+                confirmDeleteProductId === selectedEditProductId
+                  ? 'bg-red-500 hover:bg-red-600 text-white border border-red-500'
+                  : 'border border-red-200 hover:bg-red-50 text-red-400 hover:text-red-600'
+              }`}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{confirmDeleteProductId === selectedEditProductId ? '再次點擊確認刪除' : '刪除此商品'}</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => { setSelectedEditProductId(''); setConfirmDeleteProductId(''); }}
+            className="px-5 py-3 border border-[#2C2C2A]/15 hover:bg-[#2C2C2A]/5 text-xs text-[#2C2C2A]/60 font-sans-ui font-semibold rounded-lg transition-colors cursor-pointer"
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+
+
+  // 高畫質 1080x1080 官方 IG 貼文配圖生成並下載函數
+  const handleDownloadInstagramPost = (story: Story) => {
+    // 建立一個離線的 1080x1080 Canvas 進行高解析度渲染
+    const canvas = document.createElement('canvas');
+    canvas.width = 1080;
+    canvas.height = 1080;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const isEditingCurrent = story.id === selectedEditStoryId;
+    const title = isEditingCurrent ? editTitle : story.title;
+    const description = isEditingCurrent ? editDescription : story.description;
+    const dateTag = story.date || getIssueDate(currentIssueNumber);
+    const dateStr = dateTag.split('//')[1]?.trim() || 'SUMMER 2026';
+
+    const performDrawing = (useImg?: HTMLImageElement) => {
+      // 1. 繪製背景
+      if (useImg) {
+        const canvasRatio = canvas.width / canvas.height;
+        const imgRatio = useImg.width / useImg.height;
+        let drawWidth = canvas.width;
+        let drawHeight = canvas.height;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        if (imgRatio > canvasRatio) {
+          drawWidth = canvas.height * imgRatio;
+          offsetX = (canvas.width - drawWidth) / 2;
+        } else {
+          drawHeight = canvas.width / imgRatio;
+          offsetY = (canvas.height - drawHeight) / 2;
+        }
+
+        ctx.fillStyle = '#1C1C1A';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(useImg, offsetX, offsetY, drawWidth, drawHeight);
+
+        // 2. 疊加高級雙重漸層電影混色濾鏡，確保中央文字閱讀的極致高雅對比
+        const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        grad.addColorStop(0, 'rgba(44, 44, 42, 0.65)');
+        grad.addColorStop(0.5, 'rgba(44, 44, 42, 0.45)');
+        grad.addColorStop(1, 'rgba(44, 44, 42, 0.75)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      } else {
+        // 降級純色背景：使用帶有微弱顆粒感或漸層的高雅品牌 Sage Green `#5A6351` 或 Charcoal `#2C2C2A` 混色
+        const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+        grad.addColorStop(0, '#5A6351');
+        grad.addColorStop(1, '#2C2C2A');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      // 3. 繪製品牌視覺線條邊框與角落美學對焦直角
+      // 外層細框 (3.5% Padding = 38px)
+      ctx.strokeStyle = 'rgba(244, 244, 243, 0.25)';
+      ctx.lineWidth = 2;
+      const outerPad = 38;
+      ctx.strokeRect(outerPad, outerPad, canvas.width - outerPad * 2, canvas.height - outerPad * 2);
+
+      // 內層品牌實線框 (5.5% Padding = 60px)
+      ctx.strokeStyle = 'rgba(244, 244, 243, 0.65)';
+      ctx.lineWidth = 3;
+      const innerPad = 60;
+      ctx.strokeRect(innerPad, innerPad, canvas.width - innerPad * 2, canvas.height - innerPad * 2);
+
+      // 角落 L 型輔助直角 (角落內縮邊框 22px)
+      ctx.strokeStyle = 'rgba(244, 244, 243, 0.9)';
+      ctx.lineWidth = 4;
+      const cornerSize = 25;
+      const cornerOffset = innerPad + 22;
+
+      // 左上角
+      ctx.beginPath();
+      ctx.moveTo(cornerOffset, cornerOffset + cornerSize);
+      ctx.lineTo(cornerOffset, cornerOffset);
+      ctx.lineTo(cornerOffset + cornerSize, cornerOffset);
+      ctx.stroke();
+
+      // 右上角
+      ctx.beginPath();
+      ctx.moveTo(canvas.width - cornerOffset - cornerSize, cornerOffset);
+      ctx.lineTo(canvas.width - cornerOffset, cornerOffset);
+      ctx.lineTo(canvas.width - cornerOffset, cornerOffset + cornerSize);
+      ctx.stroke();
+
+      // 左下角
+      ctx.beginPath();
+      ctx.moveTo(cornerOffset, canvas.height - cornerOffset - cornerSize);
+      ctx.lineTo(cornerOffset, canvas.height - cornerOffset);
+      ctx.lineTo(cornerOffset + cornerSize, canvas.height - cornerOffset);
+      ctx.stroke();
+
+      // 右下角
+      ctx.beginPath();
+      ctx.moveTo(canvas.width - cornerOffset - cornerSize, canvas.height - cornerOffset);
+      ctx.lineTo(canvas.width - cornerOffset, canvas.height - cornerOffset);
+      ctx.lineTo(canvas.width - cornerOffset, canvas.height - cornerOffset - cornerSize);
+      ctx.stroke();
+
+      // 4. 繪製頁首 OASIS LAB. 品牌資訊 (Centered)
+      ctx.fillStyle = '#F4F4F3';
+      ctx.textAlign = 'center';
+      
+      ctx.font = '800 28px Courier New, monospace';
+      ctx.fillText('OASIS LAB.', canvas.width / 2, innerPad + 60);
+
+      ctx.fillStyle = 'rgba(244, 244, 243, 0.6)';
+      ctx.font = 'bold 18px Courier New, monospace';
+      ctx.fillText('// EDITORIAL JOURNAL //', canvas.width / 2, innerPad + 95);
+
+      // 5. 核心排版：專題標題與摘要文字 (Centered)
+      // 裝飾用雙側水平引線
+      ctx.strokeStyle = 'rgba(244, 244, 243, 0.35)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(canvas.width / 2 - 40, canvas.height / 2 - 130);
+      ctx.lineTo(canvas.width / 2 + 40, canvas.height / 2 - 130);
+      ctx.stroke();
+
+      // 繪製中文標題 (高雅明體字)
+      ctx.fillStyle = '#F4F4F3';
+      ctx.font = '900 46px Georgia, PMingLiU, serif';
+      const maxTextWidth = canvas.width - innerPad * 2 - 180;
+      
+      const titleLines = [];
+      const titleChars = title.split('');
+      let line = '';
+      for (let n = 0; n < titleChars.length; n++) {
+        const testLine = line + titleChars[n];
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxTextWidth && n > 0) {
+          titleLines.push(line);
+          line = titleChars[n];
+        } else {
+          line = testLine;
+        }
+      }
+      titleLines.push(line);
+
+      let titleY = canvas.height / 2 - 50;
+      const titleLineHeight = 65;
+      titleLines.forEach(l => {
+        ctx.fillText(l, canvas.width / 2, titleY);
+        titleY += titleLineHeight;
+      });
+
+      // 中間點綴水平引線
+      ctx.strokeStyle = 'rgba(244, 244, 243, 0.25)';
+      ctx.beginPath();
+      ctx.moveTo(canvas.width / 2 - 30, titleY - 10);
+      ctx.lineTo(canvas.width / 2 + 30, titleY - 10);
+      ctx.stroke();
+
+      // 繪製溫潤摘要文字 (明體斜體字)
+      ctx.fillStyle = 'rgba(244, 244, 243, 0.85)';
+      ctx.font = 'italic 28px Georgia, PMingLiU, serif';
+      
+      const descLines = [];
+      const descText = `“${description}”`;
+      const descChars = descText.split('');
+      let descLine = '';
+      for (let n = 0; n < descChars.length; n++) {
+        const testLine = descLine + descChars[n];
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxTextWidth && n > 0) {
+          descLines.push(descLine);
+          descLine = descChars[n];
+        } else {
+          descLine = testLine;
+        }
+      }
+      descLines.push(descLine);
+
+      let descY = titleY + 30;
+      const descLineHeight = 44;
+      descLines.forEach(l => {
+        ctx.fillText(l, canvas.width / 2, descY);
+        descY += descLineHeight;
+      });
+
+      // 下引線
+      ctx.strokeStyle = 'rgba(244, 244, 243, 0.35)';
+      ctx.beginPath();
+      ctx.moveTo(canvas.width / 2 - 40, descY);
+      ctx.lineTo(canvas.width / 2 + 40, descY);
+      ctx.stroke();
+
+      // 6. 繪製頁尾期刊期數與日期標籤
+      ctx.fillStyle = 'rgba(244, 244, 243, 0.9)';
+      ctx.font = 'bold 22px Courier New, monospace';
+      ctx.fillText(`ISSUE ${String(currentIssueNumber).padStart(3, '0')} // ${story.targetTag.toUpperCase()}`, canvas.width / 2, canvas.height - innerPad - 80);
+
+      ctx.fillStyle = 'rgba(244, 244, 243, 0.45)';
+      ctx.font = 'bold 16px Courier New, monospace';
+      ctx.fillText(dateStr, canvas.width / 2, canvas.height - innerPad - 45);
+
+      // 7. 將 Canvas 匯出為高畫質 PNG 並觸發瀏覽器下載流程
+      try {
+        const url = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = `OasisLab_IG_${story.id}.png`;
+        link.href = url;
+        link.click();
+        triggerToast(`📸 專題社群貼文圖片《OasisLab_IG_${story.id}.png》已成功匯出至您的本機！`);
+      } catch (err) {
+        console.error(err);
+        // 如果是 CORS 安全性報錯，降級用純色重繪並重新導出 (100% 成功保證)
+        if (useImg) {
+          triggerToast('⚠️ 偵測到底圖安全性存取限制 (CORS)，已自動為您調校為極簡品牌底色並完成匯出！');
+          performDrawing();
+        } else {
+          triggerToast('❌ 底圖安全存取限制 (CORS)，請確認底圖聯網授權。');
+        }
+      }
+    };
+
+    // 載入背景封面圖片，確保支援 CORS 跨網域渲染
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = story.coverImage;
+    triggerToast('⏳ 正在以 Oasis Lab. 品牌語彙轉譯與生成官方 IG 貼文圖片 (1080x1080)...');
+
+    img.onload = () => {
+      performDrawing(img);
+    };
+
+    img.onerror = () => {
+      triggerToast('❌ 底圖載入失敗，可能因圖片網址不支援或跨網域(CORS)限制。');
+    };
   };
 
   // PWA (Progressive Web App) 狀態
@@ -436,30 +1001,21 @@ export default function App() {
 【寫作指導風格與要求】：
 - 文字風格必須是散發文藝氣息的繁體中文，行文高雅精緻，段落分明，富有生活儀式感。
 - 每篇文章的 'content' 欄位必須是長篇深度文章（至少 3-4 個段落），不要有任何 markdown 代碼標記（如 \`\`\` 等），使用換行符 (\\n) 分割段落。
-- **【標題極簡與多樣化要求】**：在撰寫文章標題 ("title") 時，**請絕對不要包含任何年份或數字（例如 2025、2026、2027、今年、新的一年等）**。請保持標題的多樣性與文學美感，以抽象、溫潤、富有生活哲思的方式命名（例如《專注的儀式》、《日常的留白》、《流動的精神聖殿》等），嚴禁千篇一律地使用帶年份的格式。
+- **【標題極簡與高度多樣化要求】**：在撰寫文章標題 ("title") 時，**請絕對不要包含任何年份、數字（例如 2026、今年、5個、3個等）或千篇一律的「OO提案」、「OO指引」、「OO必備」等容易重複的公式化標題**。請保持標題的高度多樣性與深刻意境，善用隱喻、動詞與留白，使其呈現出富有人文呼吸感與哲學思辨的文藝氣息。
+【標題美學靈感範例（供參考並激發靈感，請勿直接複製）：】
+  * 哲思與內心留白類：《減法，是為了給心靈騰出空間》、《安靜的底色》、《日常的留白》、《流動的精神聖殿》、《在無事中，聽見時間的深度》
+  * 空間、光影與器物類：《器物與光：尋找生活中的永恆質地》、《理想居所：少一點裝飾，多一點呼吸》、《材質的經年變化》
+  * 慢行旅與角落充電類：《慢速行路：東京街角的隱密綠洲》、《流動的居所》、《流浪者的安靜早晨》、《與一座山的安靜對話》
+請務必靈活發揮您的文字美學造詣，確保三篇文章的標題各自具備獨立的靈魂、截然不同的語感與視角，徹底避免千篇一律的重複套路。
 
-【封面圖配對】：
-請為每篇文章的 'coverImage' 欄位，從以下為您精心整理的視覺美學清單中，挑選最符合該主題的一張【完整 URL】：
-* 游牧數位 用圖：
-  - https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1200&q=80
-  - https://images.unsplash.com/photo-1504607798333-52a30db54a5d?auto=format&fit=crop&w=1200&q=80
-  - https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1200&q=80
-  - https://images.unsplash.com/photo-1527689368864-3a821dbccc34?auto=format&fit=crop&w=1200&q=80
-* 辦公美學 用圖：
-  - https://images.unsplash.com/photo-1493934558415-9d19f0b2b4d2?auto=format&fit=crop&w=1200&q=80
-  - https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1200&q=80
-  - https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80
-  - https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=1200&q=80
-* 極簡美學 用圖：
-  - https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=1200&q=80
-  - https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=1200&q=80
-  - https://images.unsplash.com/photo-1507652313519-d4e9174996dd?auto=format&fit=crop&w=1200&q=80
-  - https://images.unsplash.com/photo-1540518614846-7eded433c457?auto=format&fit=crop&w=1200&q=80
-* 旅行 用圖：
-  - https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=1200&q=80
-  - https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&w=1200&q=80
-  - https://images.unsplash.com/photo-1506929562872-bb421503ef21?auto=format&fit=crop&w=1200&q=80
-  - https://images.unsplash.com/photo-1539635278303-d4002c07eae3?auto=format&fit=crop&w=1200&q=80
+【封面圖動態生成】：
+請為每篇文章產出一個極具畫面感的英文提示詞，我們將用它來生成專屬封面圖。
+
+【提示詞撰寫要求】：
+1. 必須是全英文，請根據你寫的文章內容提取核心視覺元素。
+2. 描述應具有極簡美學、高質感、真實攝影風格與光影感（例如：a minimalist office desk with warm morning sunlight, aesthetic, photorealistic, cinematic lighting, 8k resolution, magazine photography）。
+3. 只需要輸出英文單詞或句子，不需要寫 URL 格式。
+4. 請確保這三篇文章的提示詞各自獨特，完美呈現不同的視覺氛圍。
 
 請直接輸出符合以下 Story Schema 的 JSON 陣列，直接使用 \`\`\`json ... \`\`\` 區塊包裹輸出。所有文字內容必須是繁體中文！其中 Schema 的每個物件格式如下：
 {
@@ -470,7 +1026,7 @@ export default function App() {
   "description": "1-2 句極具吸引力的摘要說明",
   "content": "深度極簡慢活美學文章（至少 3-4 個段落，行文溫潤優雅，段落間用 \\n 隔開，不要帶額外 markdown 標記）",
   "targetTag": "日常充電 或 辦公室必備 或 極簡旅行 (必須完全一致，不能寫其他內容)",
-  "coverImage": "從上方清單挑選的最佳 Unsplash URL",
+  "coverImagePrompt": "依據上方要求所寫的純英文高質感圖片提示詞",
   "author": "編輯姓名，如 '主編・Elian'",
   "readTime": "閱讀時間，如 '4 Mins Read'",
   "date": "必須為 '${nextIssueDate}'"
@@ -507,7 +1063,7 @@ export default function App() {
             ]
           }
         ],
-        system_instruction: {
+        systemInstruction: {
           parts: [
             {
               text: systemInstructions
@@ -516,16 +1072,16 @@ export default function App() {
         },
         tools: [
           {
-            google_search: {}
+            googleSearch: {}
           }
         ],
-        generation_config: {
+        generationConfig: {
           temperature: 0.7,
-          response_mime_type: "text/plain"
+          responseMimeType: "text/plain"
         }
       };
 
-      const apiResponse = await fetch(apiEndpoint, {
+      let apiResponse = await fetch(apiEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -538,10 +1094,42 @@ export default function App() {
         throw new Error((errDetails as any)?.error?.message || `API HTTP error! Status: ${apiResponse.status}`);
       }
 
-      const resData = await apiResponse.json();
-      const rawText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+      let resData = await apiResponse.json();
+      let parts = resData.candidates?.[0]?.content?.parts;
+      let rawText = Array.isArray(parts) ? parts.find((p: any) => p.text)?.text : undefined;
+
+      // 如果啟用 Google 搜尋 Grounding 時回傳了空內容（例如因為 API 內部整合限制或 STOP 異常）
+      // 我們自動採取「美學智囊降級重試機制（移除搜尋工具）」，確保策展 100% 成功生成，免受服務波動影響！
       if (!rawText) {
-        throw new Error('Could not retrieve curated stories text from Gemini API response.');
+        console.warn('⚠️ Google 搜尋整合回傳空資料或發生 STOP 錯誤，已自動啟動「美學總編降級重試機制（無搜尋工具）」以確保新刊發行成功...');
+        
+        const retryRequestBody = {
+          ...requestBody,
+          tools: undefined // 移除 Google Search tools 進行常規極速生成
+        };
+
+        const retryResponse = await fetch(apiEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(retryRequestBody)
+        });
+
+        if (!retryResponse.ok) {
+          const errDetails = await retryResponse.json().catch(() => ({}));
+          throw new Error((errDetails as any)?.error?.message || `API HTTP error! Status: ${retryResponse.status}`);
+        }
+
+        resData = await retryResponse.json();
+        parts = resData.candidates?.[0]?.content?.parts;
+        rawText = Array.isArray(parts) ? parts.find((p: any) => p.text)?.text : undefined;
+      }
+
+      if (!rawText) {
+        console.error('Gemini API Full Response (After Retry):', resData);
+        const finishReason = resData.candidates?.[0]?.finishReason || 'UNKNOWN';
+        throw new Error(`Could not retrieve curated stories text. Reason: ${finishReason}. Details: ${JSON.stringify(resData.candidates?.[0])}`);
       }
 
       setGenerationStep('designing');
@@ -563,13 +1151,32 @@ export default function App() {
       }
 
       // 將生成的故事 ID 附帶期刊號進行唯一化，避免 key 重複衝突
-      const uniqueParsedStories = parsedStories.map((story, index) => {
+      const uniqueParsedStories = parsedStories.map((story: any, index) => {
         const safeIndex = index + 1;
+        let finalCoverImage = '';
+        
+        if (story.coverImagePrompt && story.coverImagePrompt.trim() !== '') {
+          // 加上使用者要求的中文與英文對譯構圖限制提示詞，以利 Pollinations AI 生成最高畫質、無變形之廣角寬幅相片
+          // 加上適合 1:1 正方形圖片比例之構圖限制提示詞，以利 Pollinations AI 生成最高畫質、無變形之正方形相片
+          const userConstraint = `【請嚴格遵守以下構圖限制，不要改變我原本提示詞的內容主體】："這是一張 1:1 正方形圖片。請使用高品質廣角鏡頭構圖，讓主體完美平衡地置於中央，直接延伸四周的環境背景來填滿畫面。嚴禁將畫面內容進行任何水平或垂直方向的拉伸、壓扁、擠壓或扭曲。所有的物理幾何結構、比例與物件邊緣，必須保持絕對正確與筆直，完全避免 AI 幾何變形的痕跡。" 我的主體提示詞：[ ${story.coverImagePrompt.trim()} ]`;
+          
+          const englishConstraint = `This is a 1:1 square aspect ratio image. Please strictly follow these composition constraints without changing the core subject: "This is a 1:1 square image. Please use a true wide-angle lens composition, centering the subject in a perfectly balanced manner, extending the surrounding environment and background to fill the frame. Horizontal or vertical stretching, squishing, compressing, or distortion of the content is strictly prohibited. All physical geometry, proportions, and object edges must remain absolutely correct, straight, and realistic, avoiding any trace of AI geometric distortion." Original Subject Prompt: ${story.coverImagePrompt.trim()}`;
+          
+          const enhancedPrompt = `${englishConstraint}, ${userConstraint}, masterpiece, highly detailed, 8k resolution, photorealistic, cinematic lighting, aesthetic magazine photography, clean composition`;
+          finalCoverImage = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=1080&height=1080&nologo=true`;
+        } else if (story.coverImage && story.coverImage.trim() !== '') {
+          finalCoverImage = story.coverImage.startsWith('http') ? story.coverImage : `https://${story.coverImage}`;
+        } else {
+          // 當完全沒有封面圖生成線索時，使用精心配置的類別高解析度備份圖，確保一定是美觀的
+          finalCoverImage = getFallbackImage(story.targetTag, index);
+        }
+
         return {
           ...story,
           id: `story-i${nextIssueNum}-0${safeIndex}`,
-          subtitle: `STORY 0${safeIndex} // ${story.subtitle.split('//')[1]?.trim() || '新期刊專題'}`,
-          date: nextIssueDate
+          subtitle: `STORY 0${safeIndex} // ${story.subtitle?.split('//')[1]?.trim() || '新期刊專題'}`,
+          date: nextIssueDate,
+          coverImage: finalCoverImage
         };
       });
 
@@ -598,8 +1205,15 @@ export default function App() {
       
       // 降級與發行回滾處理
       await new Promise(resolve => setTimeout(resolve, 1200));
+      
+      // 判斷是否為 API Quota / Rate Limit 限制
+      const isRateLimit = error.message?.toLowerCase().includes('quota') || error.message?.includes('429');
+      const friendlyMsg = isRateLimit 
+        ? "您目前使用的是 Gemini 免費方案，由於操作較頻繁，已達每分鐘 API 配額限制，請等待大約 1 分鐘後再次點擊即可！"
+        : (error.message || '網路異常');
+
       // 當生成失敗時，我們保持在原本的期數與故事狀態，並回報錯誤
-      triggerToast(`⚠️ 聯網搜尋與 AI 寫作失敗（${error.message || '網路異常'}），已維持在當前第 ${String(currentIssueNumber).padStart(3, '0')} 期設定。`);
+      triggerToast(`⚠️ 聯網搜尋與 AI 寫作失敗（${friendlyMsg}），已維持在當前第 ${String(currentIssueNumber).padStart(3, '0')} 期設定。`);
     } finally {
       setIsGenerating(false);
       setGenerationStep('idle');
@@ -661,12 +1275,13 @@ export default function App() {
           ...s,
           title: editTitle,
           description: editDescription,
-          content: editContent
+          content: editContent,
+          coverImage: editCoverImage
         };
       }
       return s;
     }));
-    triggerToast(`✨ 已成功更新專題《${editTitle}》的文字內容，並即時發布至前台！`);
+    triggerToast(`✨ 已成功更新專題《${editTitle}》的文字與封面圖內容，並即時發布至前台！`);
   };
 
   // 設定編輯器預設選取的專題
@@ -686,6 +1301,8 @@ export default function App() {
       setEditTitle(story.title);
       setEditDescription(story.description);
       setEditContent(story.content);
+      setEditCoverImage(story.coverImage);
+      setStoryUrlInput('');
     }
   }, [selectedEditStoryId, activeStories]);
 
@@ -693,6 +1310,262 @@ export default function App() {
   useEffect(() => {
     setRollbackIssueNum(currentIssueNumber);
   }, [currentIssueNumber]);
+
+  // ================== 【自訂 3:2 封面圖裁切上傳功能】 ==================
+  const handleCropFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setCropSrc(event.target.result as string);
+        setCropZoom(1.0);
+        setCropPanX(0);
+        setCropPanY(0);
+        setShowCropModal(true);
+      }
+    };
+    reader.readAsDataURL(file);
+    // 重置 input value 讓同一個檔案可以重複觸發變更事件
+    e.target.value = '';
+  };
+
+  const handleCropUrlLoad = (url: string) => {
+    if (!url || !url.trim().startsWith('http')) {
+      triggerToast('⚠️ 請輸入正確的聯網圖片網址！');
+      return;
+    }
+    setCropSrc(url.trim());
+    setCropZoom(1.0);
+    setCropPanX(0);
+    setCropPanY(0);
+    setShowCropModal(true);
+  };
+
+  const handleCropStart = (clientX: number, clientY: number) => {
+    setIsDraggingCrop(true);
+    setDragStart({ x: clientX, y: clientY });
+  };
+
+  const handleCropMove = (clientX: number, clientY: number) => {
+    if (!isDraggingCrop) return;
+    const dx = clientX - dragStart.x;
+    const dy = clientY - dragStart.y;
+    setCropPanX(prev => prev + dx);
+    setCropPanY(prev => prev + dy);
+    setDragStart({ x: clientX, y: clientY });
+  };
+
+  const handleCropEnd = () => {
+    setIsDraggingCrop(false);
+  };
+
+  const handleCropMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    handleCropStart(e.clientX, e.clientY);
+  };
+
+  const handleCropMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingCrop) return;
+    e.preventDefault();
+    handleCropMove(e.clientX, e.clientY);
+  };
+
+  const handleCropTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length > 0) {
+      handleCropStart(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  };
+
+  const handleCropTouchMove = (e: React.TouchEvent) => {
+    if (!isDraggingCrop || e.touches.length === 0) return;
+    handleCropMove(e.touches[0].clientX, e.touches[0].clientY);
+  };
+
+  const handleApplyCrop = () => {
+    if (!cropSrc) return;
+    
+    triggerToast('⏳ 正在生成 1:1 高畫質裁切封面圖 (1000x1000)...');
+    
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = cropSrc;
+    
+    img.onload = () => {
+      // 建立一個 1000x1000 的 Canvas 用於高品質裁剪輸出 (完美符合 1:1 封面圖尺寸)
+      const canvas = document.createElement('canvas');
+      canvas.width = 1000;
+      canvas.height = 1000;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      
+      const W_v = 350;
+      const H_v = 350;
+      const W_i = img.naturalWidth;
+      const H_i = img.naturalHeight;
+      
+      const scaleX = W_v / W_i;
+      const scaleY = H_v / H_i;
+      const baseScale = Math.max(scaleX, scaleY);
+      
+      const zoomScale = baseScale * cropZoom;
+      
+      // 計算裁剪區域在原始圖片中的座標和尺寸 (精確反向對應)
+      const wCrop = W_v / zoomScale;
+      const hCrop = H_v / zoomScale;
+      
+      const xCrop = (W_i / 2) - ((W_v / 2) + cropPanX) / zoomScale;
+      const yCrop = (H_i / 2) - ((H_v / 2) + cropPanY) / zoomScale;
+      
+      ctx.drawImage(img, xCrop, yCrop, wCrop, hCrop, 0, 0, canvas.width, canvas.height);
+      
+      try {
+        const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        setEditCoverImage(croppedDataUrl);
+        setShowCropModal(false);
+        triggerToast('✨ 封面圖已成功完成 1:1 裁切並即時套用！請點擊下方按鈕儲存變更。');
+      } catch (err) {
+        console.error(err);
+        triggerToast('❌ 圖片裁切匯出受限 (可能由於跨網域 CORS 問題，請嘗試從本機上傳圖片檔案即可完美避開此限制)。');
+      }
+    };
+    
+    img.onerror = () => {
+      triggerToast('❌ 無法載入裁剪來源圖片，請檢查圖片網址或檔案是否毀損。');
+    };
+  };
+
+  // ================== 【一鍵 AI 自動上架商品】 ==================
+  const handleAiAutoFillProduct = async () => {
+    const inputVal = aiAutoFillInput.trim();
+    if (!inputVal) {
+      triggerToast('⚠️ 請輸入商品名稱或貼上聯盟行銷網址。');
+      return;
+    }
+    setIsAiAutoFilling(true);
+    try {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey || apiKey.trim() === '' || apiKey.startsWith('nvapi-')) {
+        throw new Error('請設定有效的 VITE_GEMINI_API_KEY 環境變數。');
+      }
+
+      const isUrl = /^https?:\/\//i.test(inputVal);
+      const userPrompt = isUrl
+        ? `你是一位精通電商選物美學的 Oasis Lab. 商品策展編輯。
+使用者提供了以下聯盟行銷商品網址：
+${inputVal}
+
+請先使用 Google Search 工具搜尋此網址對應的商品，取得正確的商品名稱、價格、商品特色、品牌等真實資訊，然後以 Oasis Lab. 極簡美學雜誌的高質感文案風格，生成以下 JSON 格式的商品資料（所有文字用繁體中文）：
+{
+  "title_optimized": "根據搜尋結果精煉優化的商品名稱（30字以內，突顯核心賣點與設計感）",
+  "price_display": "根據搜尋結果填入真實售價，格式如 'NT$ 1,980' 或 '洽詢優惠'",
+  "btn_text": "導購按鈕文字（8字以內，如：探索生活靈感、立即選購）",
+  "description": "根據搜尋結果，一句話點出此商品的核心美學與生活場景（20-35字）",
+  "context_tags": ["日常充電", "辦公室必備", "極簡旅行"] 中選擇最符合的1-2個，以陣列格式輸出,
+  "image_url": "從 Unsplash 選一張最符合商品美學的高清圖片完整 URL（含 ?auto=format&fit=crop&w=600&q=80 參數）"
+}
+只輸出 JSON，不要有任何說明文字或代碼區塊標記。`
+        : `你是一位精通電商選物美學的 Oasis Lab. 商品策展編輯。
+使用者想上架以下商品（商品名稱/關鍵字）：
+「${inputVal}」
+
+請先使用 Google Search 工具搜尋此商品的最新資訊（包含價格、特色、品牌、用戶評價等），再以 Oasis Lab. 極簡美學雜誌的高質感文案風格，生成以下 JSON 格式的商品資料（所有文字用繁體中文）：
+{
+  "title_optimized": "根據搜尋結果精煉優化的商品名稱（30字以內，突顯核心賣點與設計感）",
+  "price_display": "根據搜尋結果的真實市場售價，格式如 'NT$ 1,980'",
+  "btn_text": "導購按鈕文字（8字以內，如：探索生活靈感、立即選購）",
+  "description": "根據搜尋結果，一句話點出此商品的核心美學與生活場景（20-35字）",
+  "context_tags": ["日常充電", "辦公室必備", "極簡旅行"] 中選擇最符合的1-2個，以陣列格式輸出,
+  "image_url": "從 Unsplash 選一張最符合商品美學的高清圖片完整 URL（含 ?auto=format&fit=crop&w=600&q=80 參數）"
+}
+只輸出 JSON，不要有任何說明文字或代碼區塊標記。`;
+
+      const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+      const requestBody = {
+        contents: [{ parts: [{ text: userPrompt }] }],
+        tools: [{ googleSearch: {} }],
+        generationConfig: { temperature: 0.6, responseMimeType: 'text/plain' }
+      };
+
+      const apiResponse = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!apiResponse.ok) {
+        const errDetails = await apiResponse.json().catch(() => ({}));
+        throw new Error(`Gemini API 回報 HTTP 錯誤！狀態碼: ${apiResponse.status} - ${(errDetails as any)?.error?.message || ''}`);
+      }
+
+      const resData = await apiResponse.json();
+      const rawParts = resData.candidates?.[0]?.content?.parts;
+      const rawText = Array.isArray(rawParts) ? rawParts.find((p: any) => p.text)?.text : undefined;
+
+      if (!rawText) {
+        const finishReason = resData.candidates?.[0]?.finishReason || 'UNKNOWN';
+        throw new Error(`無法從 Gemini 回傳中取得有效生成的商品內容 (原因: ${finishReason})`);
+      }
+
+      let parsed: any;
+      try {
+        let jsonStr = rawText.trim();
+        // 優先嘗試 code block 提取
+        const codeBlockMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (codeBlockMatch && codeBlockMatch[1]) {
+          jsonStr = codeBlockMatch[1].trim();
+        } else {
+          // 若無 code block，嘗試從文字中提取第一個完整的 JSON 物件
+          const jsonObjMatch = jsonStr.match(/\{[\s\S]*?\}/);
+          if (jsonObjMatch) {
+            jsonStr = jsonObjMatch[0];
+          }
+        }
+        parsed = JSON.parse(jsonStr);
+      } catch (parseErr) {
+        // 最後嘗試：用貪婪正則尋找最長的 JSON 物件
+        try {
+          const greedyMatch = rawText.match(/\{[\s\S]*\}/);
+          if (greedyMatch) {
+            parsed = JSON.parse(greedyMatch[0]);
+          } else {
+            throw new Error('no json found');
+          }
+        } catch {
+          throw new Error('無法從 Gemini 回傳中取得有效生成的商品內容，請稍後再試。');
+        }
+      }
+
+      // 將 AI 生成的欄位填入商品編輯表單
+      if (parsed.title_optimized) setEditProductTitle(parsed.title_optimized);
+      if (parsed.price_display) setEditProductPrice(parsed.price_display);
+      if (parsed.btn_text) setEditProductBtnText(parsed.btn_text);
+      if (parsed.description) setEditProductDescription(parsed.description);
+      if (parsed.image_url) setEditProductImageUrl(parsed.image_url);
+      if (Array.isArray(parsed.context_tags)) setEditProductTags(parsed.context_tags.join(', '));
+      if (isUrl) setEditProductUrl(inputVal);
+
+      // 若尚未選擇商品，自動切換到新增模式
+      if (!selectedEditProductId || selectedEditProductId === '') {
+        setSelectedEditProductId('__NEW__');
+        setEditProductStatus('active');
+        setEditProductIsPopular(false);
+        setConfirmDeleteProductId('');
+      }
+
+      triggerToast('✨ AI 已自動生成商品資料！請確認下方各欄位後再點擊「建立並上架」。');
+    } catch (error: any) {
+      console.error('AI Product Autofill Error:', error);
+      const isRateLimit = error.message?.toLowerCase().includes('quota') || error.message?.includes('429');
+      const friendlyMsg = isRateLimit 
+        ? "目前已達到 Gemini API 免費方案配額限制，請等待大約 1 分鐘後再次點擊即可！"
+        : (error.message || '網路異常，請稍後再試');
+      triggerToast(`⚠️ AI 自動生成失敗：${friendlyMsg}`);
+    } finally {
+      setIsAiAutoFilling(false);
+    }
+  };
 
   return (
     <div id="oasis-root" className="min-h-screen bg-[#F4F4F3] text-[#2C2C2A] selection:bg-[#5A6351]/20 selection:text-[#5A6351] font-serif overflow-x-hidden relative">
@@ -1219,12 +2092,19 @@ export default function App() {
                     >
                       <div>
                         {/* 專題高質感配圖 */}
-                        <div className="relative h-48 w-full overflow-hidden bg-[#2C2C2A]/5">
+                        <div className="relative aspect-square w-full overflow-hidden bg-[#2C2C2A]/5">
                           <img 
                             src={story.coverImage} 
                             alt={story.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                             referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              const fallback = getFallbackImage(story.targetTag, i);
+                              if (target.src !== fallback) {
+                                target.src = fallback;
+                              }
+                            }}
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-60" />
                           <span className="absolute top-4 left-4 bg-[#F4F4F3] text-sm py-1 px-2.5 rounded-lg border border-[#2C2C2A]/5 font-sans-ui shadow-sm flex items-center space-x-1">
@@ -1578,12 +2458,19 @@ export default function App() {
                               className="bg-white border border-[#2C2C2A]/5 hover:border-[#5A6351]/20 rounded-xl overflow-hidden shadow-sm flex flex-col justify-between group transition-all duration-300"
                             >
                               <div>
-                                <div className="relative h-44 overflow-hidden bg-[#2C2C2A]/5">
+                                <div className="relative aspect-square overflow-hidden bg-[#2C2C2A]/5">
                                   <img
                                     src={story.coverImage}
                                     alt={story.title}
                                     className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500"
                                     referrerPolicy="no-referrer"
+                                    onError={(e) => {
+                                      const target = e.currentTarget;
+                                      const fallback = getFallbackImage(story.targetTag, 0);
+                                      if (target.src !== fallback) {
+                                        target.src = fallback;
+                                      }
+                                    }}
                                   />
                                   <span className="absolute top-3 left-3 bg-[#F4F4F3]/95 text-xs py-1 px-2.5 rounded border border-[#2C2C2A]/5 font-sans-ui flex items-center space-x-1">
                                     <span>{story.icon}</span>
@@ -1740,32 +2627,29 @@ export default function App() {
                   </form>
                 </motion.div>
               ) : (
-                <motion.div 
-                  className="space-y-8"
+                <motion.div
+                  className="space-y-6"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                 >
-                  {/* 登入後控制台主區 */}
-                  <div className="bg-white border border-[#2C2C2A]/10 hover:border-[#5A6351]/30 rounded-2xl p-8 md:p-10 shadow-[0_12px_45px_rgba(90,99,81,0.03)] group transition-all duration-300">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pb-6 border-b border-[#2C2C2A]/10 mb-6">
-                      <div className="flex items-start space-x-4">
-                        <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-600">
-                          <Feather className="w-6 h-6 animate-pulse" />
+                  {/* ===== 後台頂部操控欄 + Tab 導覽 ===== */}
+                  <div className="bg-white border border-[#2C2C2A]/10 rounded-2xl shadow-[0_8px_40px_rgba(90,99,81,0.04)] overflow-hidden">
+                    {/* 頂部帳號資訊欄 */}
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-8 py-5 border-b border-[#2C2C2A]/8">
+                      <div className="flex items-center space-x-3">
+                        <div className="p-2.5 bg-emerald-500/10 rounded-xl text-emerald-600">
+                          <Feather className="w-5 h-5 animate-pulse" />
                         </div>
                         <div>
-                          <span className="font-mono-data text-[10px] text-emerald-600 font-bold tracking-widest uppercase block mb-1">
-                            CURATOR STUDIO // 內容更新與模擬發行台
+                          <span className="font-mono-data text-[10px] text-emerald-600 font-bold tracking-widest uppercase block">
+                            CURATOR STUDIO // MASTER ACCOUNT
                           </span>
-                          <h3 className="text-xl font-bold font-serif text-[#2C2C2A]">
-                            雜誌封面與發布控制器
-                            <span className="ml-2.5 px-2 py-0.5 bg-emerald-500/10 text-emerald-600 text-[9px] font-sans-ui rounded border border-emerald-500/20 font-black tracking-widest uppercase">MASTER ACCOUNT</span>
+                          <h3 className="text-base font-bold font-serif text-[#2C2C2A]">
+                            策展發行與編輯控制中心
+                            <span className="ml-2 text-[10px] font-mono-data text-[#5A6351]/60 font-normal">ISSUE {String(currentIssueNumber).padStart(3, '0')}</span>
                           </h3>
-                          <p className="font-sans-ui text-xs text-[#2C2C2A]/60 leading-relaxed mt-1">
-                            當前展示期刊：<strong className="text-[#2C2C2A]">ISSUE 0{currentIssueNumber} 期</strong>。點發布新期能自動將當期專題全數移存到歷史典藏區 (Archive)，重現真實線上發行。
-                          </p>
                         </div>
                       </div>
-
                       <button
                         onClick={() => {
                           setIsAdminLoggedIn(false);
@@ -1773,719 +2657,692 @@ export default function App() {
                           setAdminPassword('');
                           triggerToast('🔒 已安全登出 Oasis Lab. 系統智理後台。');
                         }}
-                        className="px-4 py-2 border border-red-200 hover:bg-red-55 text-red-600 text-xs font-sans-ui font-medium rounded-lg cursor-pointer transition-colors"
+                        className="px-4 py-2 border border-red-200 hover:bg-red-50 text-red-500 text-xs font-sans-ui font-semibold rounded-lg cursor-pointer transition-colors flex items-center space-x-1.5"
                       >
-                        安全登出
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>安全登出</span>
                       </button>
                     </div>
 
-                    {/* 發行模擬說明 */}
-                    <div className="bg-[#F4F4F3] border border-[#2C2C2A]/5 p-6 rounded-xl space-y-3 mb-6">
-                      <h4 className="font-serif font-bold text-sm text-[#2C2C2A]">發行模擬說明與狀態</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-xs text-[#2C2C2A]/60 font-sans-ui">
-                        <div className="space-y-1 sm:col-span-2">
-                          <p className="flex items-center space-x-1.5 text-xs text-[#2C2C2A]/70 font-semibold mb-1">
-                            <span>💡 如何模擬真實發行：</span>
-                          </p>
-                          <ul className="list-disc pl-4 space-y-1">
-                            <li>點擊發布新期刊後，當前專題內容會移存至「歷史期刊 (Archive)」歸檔。</li>
-                            <li>AI 會自動搜尋最新美學產品與旅行趨勢，為您撰寫發布下一期新專題。</li>
-                            <li>重置功能可以讓您隨時一鍵回復至初始 ISSUE 025 狀態。</li>
-                          </ul>
-                        </div>
-                        <div className="flex flex-col justify-center items-center p-4 bg-white/60 border border-[#2C2C2A]/5 rounded-lg text-center">
-                          <span className="font-mono-data text-[10px] text-[#2C2C2A]/40 font-bold uppercase tracking-wider block mb-1">CURRENT STATUS // 發行狀態</span>
-                          <span className="font-mono-data text-xs text-[#5A6351] font-bold">
-                            {currentIssueNumber === 25 ? "待發行新期刊" : `已發布 ISSUE ${String(currentIssueNumber).padStart(3, '0')} 新期刊`}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-6">
-                      {/* 動作一：AI 策展發布 */}
-                      <div className="flex flex-col justify-between p-6 bg-[#5A6351]/5 border border-[#5A6351]/10 rounded-xl">
-                        <div>
-                          <span className="font-mono-data text-[10px] text-[#5A6351] font-bold tracking-widest block uppercase mb-1">DECISION A // AI 策展發布</span>
-                          <h4 className="font-serif font-bold text-sm text-[#2C2C2A] mb-2">發布下一期全新期刊</h4>
-                          <p className="text-xs text-[#2C2C2A]/50 font-sans-ui leading-relaxed mb-6">
-                            聯網搜尋最新趨勢，調配極簡美學語調與選物關聯，發布第 {String(currentIssueNumber + 1).padStart(3, '0')} 期文章。
-                          </p>
-                        </div>
+                    {/* Tab 導覽欄 */}
+                    <div className="flex border-b border-[#2C2C2A]/8 bg-[#F4F4F3]/40">
+                      {([
+                        { key: 'stories' as const, icon: '📖', label: '專題區', sublabel: 'Editorial' },
+                        { key: 'products' as const, icon: '🛍️', label: '商品區', sublabel: 'Products' },
+                        { key: 'stats' as const, icon: '📊', label: '數據區', sublabel: 'Analytics' },
+                      ]).map((tab) => (
                         <button
-                          onClick={() => {
-                            setNomadKeyword('');
-                            setOfficeKeyword('');
-                            setMinimalistTravelKeyword('');
-                            setShowKeywordModal(true);
-                          }}
-                          disabled={isGenerating}
-                          className={`w-full text-white font-sans-ui text-xs font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition-all text-center flex items-center justify-center space-x-1.5 whitespace-nowrap ${
-                            isGenerating 
-                              ? 'bg-[#5A6351]/50 cursor-not-allowed' 
-                              : 'bg-[#5A6351] hover:bg-[#4E5646] cursor-pointer'
+                          key={tab.key}
+                          type="button"
+                          onClick={() => setAdminActiveTab(tab.key)}
+                          className={`flex-1 flex flex-col items-center py-4 px-3 text-center transition-all cursor-pointer relative border-b-2 ${
+                            adminActiveTab === tab.key
+                              ? 'border-[#5A6351] bg-white text-[#5A6351]'
+                              : 'border-transparent text-[#2C2C2A]/50 hover:text-[#5A6351] hover:bg-white/60'
                           }`}
                         >
-                          <Sparkles className={`w-4 h-4 text-white ${isGenerating ? 'animate-spin' : ''}`} />
-                          <span>{isGenerating ? '正在聯網搜尋與 AI 寫作中...' : `發布 ISSUE ${String(currentIssueNumber + 1).padStart(3, '0')} 全新期刊`}</span>
+                          <span className="text-lg mb-0.5">{tab.icon}</span>
+                          <span className="font-sans-ui text-xs font-bold">{tab.label}</span>
+                          <span className="font-mono-data text-[9px] tracking-widest opacity-60">{tab.sublabel}</span>
                         </button>
-                      </div>
-
-                      {/* 動作二：系統狀態重置 */}
-                      <div className="flex flex-col justify-between p-6 bg-[#2C2C2A]/5 border border-[#2C2C2A]/10 rounded-xl">
-                        <div>
-                          <span className="font-mono-data text-[10px] text-[#2C2C2A]/50 font-bold tracking-widest block uppercase mb-1">DECISION B // 系統狀態重置</span>
-                          <h4 className="font-serif font-bold text-sm text-[#2C2C2A] mb-2">回復指定期刊設定</h4>
-                          <p className="text-xs text-[#2C2C2A]/50 font-sans-ui leading-relaxed mb-6">
-                            選擇將整個期刊系統與文章配置完美重置回指定的歷史期數狀態，小於所選期數的歷史封存將被保留，大於等於的將被清除。
-                          </p>
-                        </div>
-                        <div className="flex flex-col gap-3.5">
-                          <div className="flex items-center space-x-2 bg-white/50 border border-[#2C2C2A]/15 rounded-lg px-3 py-2">
-                            <span className="font-sans-ui text-xs text-[#2C2C2A]/60 shrink-0">重置至：</span>
-                            <select
-                              value={rollbackIssueNum}
-                              onChange={(e) => setRollbackIssueNum(parseInt(e.target.value, 10))}
-                              className="flex-1 bg-transparent text-[#2C2C2A] text-xs font-sans-ui font-semibold focus:outline-none cursor-pointer"
-                            >
-                              {(() => {
-                                const options = [];
-                                for (let i = 25; i <= currentIssueNumber; i++) {
-                                  options.push(
-                                    <option key={i} value={i} className="text-[#2C2C2A]">
-                                      第 {i} 期 (ISSUE {String(i).padStart(3, '0')})
-                                    </option>
-                                  );
-                                }
-                                return options;
-                              })()}
-                            </select>
-                          </div>
-                          
-                          <button
-                            onClick={() => handleRollbackToIssue(rollbackIssueNum)}
-                            className="w-full bg-[#2C2C2A] hover:bg-[#3D3D3A] text-white font-sans-ui text-xs font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition-all text-center cursor-pointer whitespace-nowrap"
-                          >
-                            <span>確認重置至指定期刊</span>
-                          </button>
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
 
-                  {/* 專題文字編輯器智理台 */}
-                  <div className="bg-white border border-[#2C2C2A]/10 rounded-2xl p-8 shadow-[0_12px_45px_rgba(90,99,81,0.03)] transition-all duration-300">
-                    <div className="flex items-center space-x-3 text-[#2C2C2A] pb-4 border-b border-[#2C2C2A]/5 mb-6">
-                      <Feather className="w-5 h-5 text-[#5A6351]" />
-                      <span className="font-mono-data text-xs tracking-widest font-bold uppercase text-[#5A6351]">EDITORIAL DESK // 專題文字編輯室</span>
-                    </div>
+                  {/* ===== Tab 內容區域 ===== */}
+                  <AnimatePresence mode="wait">
 
-                    <p className="font-sans-ui text-xs text-[#2C2C2A]/60 leading-relaxed mb-6">
-                      在此您可以直接編輯當前第 <strong>{String(currentIssueNumber).padStart(3, '0')}</strong> 期的三篇 Active 精選專題內容。選擇下方的分頁標籤即可切換，修改後點擊儲存，前台以及深度詳細頁的文字即會即時更新。
-                    </p>
-
-                    {/* 專題 Tabs 切換標籤 */}
-                    <div className="flex flex-col sm:flex-row gap-2 mb-6">
-                      {activeStories.map((story, index) => {
-                        const isSelected = story.id === selectedEditStoryId;
-                        return (
-                          <button
-                            key={story.id}
-                            type="button"
-                            onClick={() => setSelectedEditStoryId(story.id)}
-                            className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2.5 rounded-lg text-xs font-sans-ui font-bold border transition-all cursor-pointer ${
-                              isSelected
-                                ? 'bg-[#5A6351] text-[#F4F4F3] border-[#5A6351] shadow-sm'
-                                : 'bg-[#F4F4F3]/50 text-[#2C2C2A]/70 hover:bg-[#2C2C2A]/5 border-[#2C2C2A]/10'
-                            }`}
-                          >
-                            <span>{story.icon}</span>
-                            <span className="truncate max-w-[120px]">{story.title || `專題 0${index + 1}`}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* 編輯表單內容 */}
-                    {activeStories.find(s => s.id === selectedEditStoryId) && (
-                      <div className="space-y-5 font-sans-ui text-xs text-[#2C2C2A]/80">
-                        <div>
-                          <label className="block text-xs font-mono-data text-[#2C2C2A]/60 uppercase tracking-wider mb-2">專題標題 (Title)</label>
-                          <input
-                            type="text"
-                            value={editTitle}
-                            onChange={(e) => setEditTitle(e.target.value)}
-                            placeholder="請輸入專題標題"
-                            className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-serif font-bold text-sm transition-all"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-mono-data text-[#2C2C2A]/60 uppercase tracking-wider mb-2">專題引言 / 摘要 (Description)</label>
-                          <textarea
-                            rows={3}
-                            value={editDescription}
-                            onChange={(e) => setEditDescription(e.target.value)}
-                            placeholder="請輸入 1-2 句吸引讀者的引言"
-                            className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui leading-relaxed transition-all resize-none"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-mono-data text-[#2C2C2A]/60 uppercase tracking-wider mb-2">深度專題內文 (Content)</label>
-                          <textarea
-                            rows={10}
-                            value={editContent}
-                            onChange={(e) => setEditContent(e.target.value)}
-                            placeholder="請輸入深度內文，段落間請以兩次換行隔開"
-                            className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-serif leading-loose text-justify transition-all"
-                          />
-                        </div>
-
-                        <div className="pt-2">
-                          <button
-                            type="button"
-                            onClick={handleSaveStoryEdits}
-                            className="w-full bg-[#5A6351] hover:bg-[#4E5646] text-white font-sans-ui text-xs font-bold py-3 px-4 rounded-lg cursor-pointer transition-all flex items-center justify-center space-x-2 shadow-md hover:shadow-lg"
-                          >
-                            <CheckCircle2 className="w-4 h-4 text-white" />
-                            <span>儲存並發布此專題變更</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 實際數字與 點擊率 統計智理台 */}
-                  <div className="bg-white border border-[#2C2C2A]/10 rounded-2xl p-8 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-[#2C2C2A]/5 mb-6">
-                      <div className="flex items-center space-x-3 text-[#2C2C2A]">
-                        <Database className="w-5 h-5 text-[#5A6351]" />
-                        <span className="font-mono-data text-xs tracking-widest font-bold uppercase text-[#5A6351]">REAL-TIME CTR ANALYTICS // 實際點擊數據統計中心</span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          const defaultStoryClicks: {[key: string]: number} = {};
-                          const allS = [...activeStories, ...archivedStories, ...NEXT_ISSUE_STORIES];
-                          allS.forEach(s => {
-                            defaultStoryClicks[s.id] = 0;
-                          });
-                          setStoryClicks(defaultStoryClicks);
-
-                          const defaultProdClicks: {[key: string]: number} = {};
-                          PRODUCTS.forEach(p => {
-                            defaultProdClicks[p.id] = 0;
-                          });
-                          setProductClicks(defaultProdClicks);
-                          triggerToast('🔄 智理統計數據已成功重置為預設初始值。');
-                        }}
-                        className="text-[10px] font-sans-ui text-[#5A6351] hover:text-[#4E5646] font-semibold underline transition-colors cursor-pointer"
+                    {/* ---- 專題區 ---- */}
+                    {adminActiveTab === 'stories' && (
+                      <motion.div
+                        key="tab-stories"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.3 }}
+                        className="space-y-6"
                       >
-                        重置實際點擊統計
-                      </button>
-                    </div>
-
-                    <p className="font-sans-ui text-xs text-[#2C2C2A]/60 leading-relaxed mb-6">
-                      此模組統計讀者在 Oasis Lab. 產生的真實對話與行文軌跡。所有查看專題、前往品牌合作通路等<strong>實際點擊數</strong>均會被儲存，並在此與隨機偏移量彙整，演算出前台呈現的高質感補給熱度。
-                    </p>
-
-                    {/* 發布和導購概述小卡 */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-                      <div className="bg-[#5A6351]/5 border border-[#5A6351]/15 rounded-xl p-5">
-                        <span className="font-mono-data text-[10px] text-[#5A6351] font-bold block mb-1 uppercase">TOTAL ACTUAL STORY CLICKS / 專題點擊</span>
-                        <div className="text-3xl font-mono-data font-black text-[#5A6351] flex items-baseline space-x-1.5">
-                          <span>{Object.values(storyClicks).reduce((a: number, b: number) => a + b, 0)}</span>
-                          <span className="text-xs font-sans-ui font-normal text-[#2C2C2A]/50">次實際點擊</span>
-                        </div>
-                      </div>
-                      <div className="bg-[#2C2C2A]/4 border border-[#2C2C2A]/10 rounded-xl p-5">
-                        <span className="font-mono-data text-[10px] text-[#2C2C2A]/60 font-bold block mb-1 uppercase">TOTAL ACTUAL PRODUCT CLICKS / 商品點擊</span>
-                        <div className="text-3xl font-mono-data font-black text-[#2C2C2A] flex items-baseline space-x-1.5">
-                          <span>{Object.values(productClicks).reduce((a: number, b: number) => a + b, 0)}</span>
-                          <span className="text-xs font-sans-ui font-normal text-[#2C2C2A]/50">次實際查看</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-6">
-                      {/* 專題點擊細節表 */}
-                      <div>
-                        <h4 className="text-xs font-mono-data text-[#5A6351] font-bold tracking-wider uppercase mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                          <span>1. 專題故事點閱明細 (Stories Views)</span>
-                          <span className="text-[10px] font-sans-ui font-normal text-[#2C2C2A]/40">點擊熱度算法：(實際點擊數 + 隨機 1XXX)</span>
-                        </h4>
-                        
-                        <div className="overflow-x-auto border border-[#2C2C2A]/10 rounded-xl bg-[#F4F4F3]/30">
-                          <table className="w-full text-left font-sans-ui text-xs text-[#2C2C2A]">
-                            <thead>
-                              <tr className="bg-[#F4F4F3] border-b border-[#2C2C2A]/10 text-[#2C2C2A]/60 text-[10px] uppercase font-bold tracking-wider">
-                                <th className="p-3">專題 ID / 名稱</th>
-                                <th className="p-3 text-center">實際點閱 (真實)</th>
-                                <th className="p-3 text-center">隨機偏移 (Offset)</th>
-                                <th className="p-3 text-right">前台顯示數</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[#2C2C2A]/5 font-mono-data">
-                              {allStories.map(story => {
-                                const real = storyClicks[story.id] || 0;
-                                const offset = storyOffsets[story.id] || 1000;
-                                return (
-                                  <tr key={story.id} className="hover:bg-[#F4F4F3]/80">
-                                    <td className="p-3 font-sans-ui font-medium">
-                                      <div className="font-bold flex items-center space-x-1.5 text-xs text-[#2C2C2A]">
-                                        <span>{story.icon}</span>
-                                        <span className="line-clamp-1">{story.title}</span>
-                                      </div>
-                                      <div className="text-[9px] font-mono-data text-[#2C2C2A]/40 leading-none mt-0.5">#{story.id}</div>
-                                    </td>
-                                    <td className="p-3 text-center font-bold text-emerald-600">{real}</td>
-                                    <td className="p-3 text-center text-[#2C2C2A]/40 font-normal">+{offset}</td>
-                                    <td className="p-3 text-right font-black text-[#5A6351]">{(real + offset).toLocaleString()}</td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-
-                      {/* 商品點擊細節表 */}
-                      <div>
-                        <h4 className="text-xs font-mono-data text-[#5A6351] font-bold tracking-wider uppercase mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                          <span>2. 選物導購點擊明細 (Products Clicks)</span>
-                          <span className="text-[10px] font-sans-ui font-normal text-[#2C2C2A]/40">查看點擊算法：(實際點擊 + (500-999隨機))</span>
-                        </h4>
-                        
-                        <div className="overflow-x-auto border border-[#2C2C2A]/10 rounded-xl bg-[#F4F4F3]/30 font-sans-ui">
-                          <table className="w-full text-left font-sans-ui text-xs text-[#2C2C2A]">
-                            <thead>
-                              <tr className="bg-[#F4F4F3] border-b border-[#2C2C2A]/10 text-[#2C2C2A]/60 text-[10px] uppercase font-bold tracking-wider">
-                                <th className="p-3">嚴選單品名稱</th>
-                                <th className="p-3 text-center">實際查看 (真實)</th>
-                                <th className="p-3 text-center">隨機偏移 (Offset)</th>
-                                <th className="p-3 text-right">前台顯示數</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[#2C2C2A]/5 font-mono-data">
-                              {PRODUCTS.map(product => {
-                                const real = productClicks[product.id] || 0;
-                                const offset = productOffsets[product.id] || 500;
-                                return (
-                                  <tr key={product.id} className="hover:bg-[#F4F4F3]/80">
-                                    <td className="p-3 font-sans-ui font-medium">
-                                      <div className="font-bold text-[#2C2C2A] text-xs line-clamp-1">{product.title_optimized}</div>
-                                      <div className="text-[9px] font-mono-data text-[#2C2C2A]/40 leading-none mt-0.5">ID: {product.id}</div>
-                                    </td>
-                                    <td className="p-3 text-center font-bold text-amber-600">{real}</td>
-                                    <td className="p-3 text-center text-[#2C2C2A]/40 font-normal font-mono-data">+{offset}</td>
-                                    <td className="p-3 text-right font-black text-[#5A6351]">{(real + offset).toLocaleString()}</td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 額外模擬：商品待審查模塊 / Pending Items Review */}
-                  <div className="bg-white border border-[#2C2C2A]/10 rounded-2xl p-8 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
-                    <div className="flex items-center space-x-3 text-[#2C2C2A] mb-6 pb-4 border-b border-[#2C2C2A]/5">
-                      <CheckCircle2 className="w-5 h-5 text-[#5A6351]" />
-                      <span className="font-mono-data text-xs tracking-widest font-bold uppercase text-[#5A6351]">HUMAN-IN-THE-LOOP // 半自動審核佇列</span>
-                    </div>
-                    <p className="font-sans-ui text-xs text-[#2C2C2A]/60 leading-relaxed mb-6">
-                      此處展示未來將加載的商品或由 AI 專家端自動分析生成的聯名內容。依據系統架構，所有新生成的商品狀態會固定標記為 <code className="bg-[#2C2C2A]/10 px-1 py-0.5 rounded text-[11px] font-mono-data text-[#2C2C2A]">status: "pending"</code>。在此可供團隊進行上架審核。
-                    </p>
-                    <div className="border border-dashed border-[#2C2C2A]/15 rounded-xl p-6 text-center text-xs text-[#2C2C2A]/40 font-sans-ui italic">
-                      暫無審查中 (Pending) 的商品待處理。AI 智理引擎狀態良好。
-                    </div>
-                  </div>
-
-                  {/* ================== 【後台 Shop 商品編輯器】 ================== */}
-                  <div className="bg-white border border-[#2C2C2A]/10 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden">
-                    {/* 頂部標題欄 */}
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-8 pb-6 border-b border-[#2C2C2A]/8">
-                      <div className="flex items-start space-x-4">
-                        <div className="p-3 bg-[#5A6351]/10 rounded-xl text-[#5A6351]">
-                          <ShoppingBag className="w-6 h-6" />
-                        </div>
-                        <div>
-                          <span className="font-mono-data text-[10px] text-[#5A6351] font-bold tracking-widest uppercase block mb-1">
-                            SHOP EDITOR // 選物商城管理系統
-                          </span>
-                          <h3 className="text-xl font-bold font-serif text-[#2C2C2A]">
-                            商品內容即時編輯台
-                          </h3>
-                          <p className="font-sans-ui text-xs text-[#2C2C2A]/55 leading-relaxed mt-1">
-                            選取商品後可即時修改所有欄位，儲存後前台 Shop 頁面與詳情面板將同步更新。共 {editableProducts.length} 款商品。
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setEditableProducts(PRODUCTS);
-                          try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(PRODUCTS)); } catch(e) {}
-                          setSelectedEditProductId('');
-                          triggerToast('🔄 商品資料已重置為系統預設值。');
-                        }}
-                        className="text-[10px] font-sans-ui text-red-400 hover:text-red-600 font-semibold underline transition-colors cursor-pointer whitespace-nowrap"
-                      >
-                        重置所有商品為預設值
-                      </button>
-                    </div>
-
-                    <div className="p-8 pt-6">
-                      {/* 商品選取列表 */}
-                      <div className="mb-6">
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
-                            <h4 className="text-xs font-mono-data text-[#2C2C2A]/50 font-bold tracking-wider uppercase">Step 1 — 選擇要編輯的商品</h4>
-                            <p className="text-[10px] font-sans-ui text-[#2C2C2A]/35 mt-0.5 flex items-center space-x-1">
-                              <GripVertical className="w-3 h-3" />
-                              <span>可拖曳排序，前台商品順序即時更新</span>
-                            </p>
+                        {/* 發行控制器 */}
+                        <div className="bg-white border border-[#2C2C2A]/10 rounded-2xl p-8 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                          <div className="flex items-center space-x-3 mb-6 pb-4 border-b border-[#2C2C2A]/5">
+                            <Sparkles className="w-5 h-5 text-[#5A6351]" />
+                            <span className="font-mono-data text-xs tracking-widest font-bold uppercase text-[#5A6351]">ISSUE PUBLISHER // 期刊發布控制器</span>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedEditProductId('__NEW__');
-                              setEditProductTitle('');
-                              setEditProductPrice('');
-                              setEditProductUrl('');
-                              setEditProductBtnText('探索生活靈感');
-                              setEditProductDescription('');
-                              setEditProductImageUrl('');
-                              setEditProductTags('');
-                              setEditProductStatus('active');
-                              setEditProductIsPopular(false);
-                              setConfirmDeleteProductId('');
-                            }}
-                            className="inline-flex items-center space-x-1.5 bg-[#5A6351]/10 hover:bg-[#5A6351]/20 text-[#5A6351] text-xs font-sans-ui font-bold px-3.5 py-2 rounded-lg border border-[#5A6351]/20 transition-all cursor-pointer"
-                          >
-                            <PlusCircle className="w-3.5 h-3.5" />
-                            <span>新增商品</span>
-                          </button>
-                        </div>
-                        <DndContext
-                          sensors={dndSensors}
-                          collisionDetection={closestCenter}
-                          onDragEnd={handleDragEnd}
-                        >
-                          <SortableContext
-                            items={editableProducts.map(p => p.id)}
-                            strategy={verticalListSortingStrategy}
-                          >
-                            <div className="flex flex-col gap-2">
-                              {editableProducts.map((product) => {
-                                const isSelected = product.id === selectedEditProductId;
-                                const isPendingDelete = confirmDeleteProductId === product.id;
-                                return (
-                                  <SortableProductRow
-                                    key={product.id}
-                                    product={product}
-                                    isSelected={isSelected}
-                                    isPendingDelete={isPendingDelete}
-                                    onSelect={() => {
-                                      setSelectedEditProductId(product.id);
-                                      setEditProductTitle(product.title_optimized);
-                                      setEditProductPrice(product.price_display);
-                                      setEditProductUrl(product.affiliate_url);
-                                      setEditProductBtnText(product.btn_text);
-                                      setEditProductDescription(product.description);
-                                      setEditProductImageUrl(product.image_url);
-                                      setEditProductTags(product.context_tags.join(', '));
-                                      setEditProductStatus(product.status);
-                                      setEditProductIsPopular(product.is_popular ?? false);
-                                      setConfirmDeleteProductId('');
-                                    }}
-                                    onDeleteRequest={() => setConfirmDeleteProductId(product.id)}
-                                    onDeleteConfirm={() => {
-                                      const next = editableProducts.filter(p => p.id !== product.id);
-                                      setEditableProducts(next);
-                                      try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(next)); } catch(e) {}
-                                      setConfirmDeleteProductId('');
-                                      if (selectedEditProductId === product.id) setSelectedEditProductId('');
-                                      triggerToast(`🗑️ 商品《${product.title_optimized.slice(0,12)}...》已刪除，前台即時同步移除。`);
-                                    }}
-                                    onDeleteCancel={() => setConfirmDeleteProductId('')}
-                                  />
-                                );
-                              })}
-                            </div>
-                          </SortableContext>
-                        </DndContext>
-                      </div>
 
-                      {/* 編輯 / 新增 表單 */}
-                      {(selectedEditProductId && (selectedEditProductId === '__NEW__' || editableProducts.find(p => p.id === selectedEditProductId))) && (
-                        <motion.div
-                          key={selectedEditProductId}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.3 }}
-                          className="border-t border-[#2C2C2A]/8 pt-6 space-y-5"
-                        >
-                          <h4 className="text-xs font-mono-data text-[#2C2C2A]/50 font-bold tracking-wider uppercase flex items-center justify-between">
-                            <span className="flex items-center space-x-2">
-                              {selectedEditProductId === '__NEW__' ? <PlusCircle className="w-3.5 h-3.5 text-[#5A6351]" /> : <Edit3 className="w-3.5 h-3.5" />}
-                              <span>{selectedEditProductId === '__NEW__' ? 'New Product — 新增商品資料' : 'Step 2 — 編輯商品內容欄位'}</span>
-                            </span>
-                          </h4>
+                          <div className="bg-[#F4F4F3] border border-[#2C2C2A]/5 p-5 rounded-xl mb-6 text-xs font-sans-ui text-[#2C2C2A]/60 leading-relaxed space-y-1.5">
+                            <p className="font-semibold text-[#2C2C2A]/70 flex items-center space-x-1.5"><span>💡</span><span>如何模擬真實發行：</span></p>
+                            <ul className="list-disc pl-5 space-y-0.5">
+                              <li>點擊發布新期刊後，當前專題內容移存至歷史典藏區 (Archive)。</li>
+                              <li>AI 聯網搜尋最新趨勢，為您自動撰寫下一期新專題。</li>
+                              <li>重置功能可隨時回復至初始 ISSUE 025 狀態。</li>
+                            </ul>
+                          </div>
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            {/* 商品名稱 */}
-                            <div className="md:col-span-2">
-                              <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">商品優化標題</label>
-                              <input
-                                type="text"
-                                value={editProductTitle}
-                                onChange={(e) => setEditProductTitle(e.target.value)}
-                                placeholder="商品的完整優化標題"
-                                className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-serif font-bold text-sm transition-all"
-                              />
-                            </div>
-
-                            {/* 價格 */}
-                            <div>
-                              <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">價格顯示文字</label>
-                              <input
-                                type="text"
-                                value={editProductPrice}
-                                onChange={(e) => setEditProductPrice(e.target.value)}
-                                placeholder="例：NT$ 1,980 或 洽詢優惠"
-                                className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-mono-data transition-all"
-                              />
-                            </div>
-
-                            {/* 按鈕文字 */}
-                            <div>
-                              <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">導購按鈕文字</label>
-                              <input
-                                type="text"
-                                value={editProductBtnText}
-                                onChange={(e) => setEditProductBtnText(e.target.value)}
-                                placeholder="例：探索生活靈感、前往選購"
-                                className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui transition-all"
-                              />
-                            </div>
-
-                            {/* 購買連結 */}
-                            <div className="md:col-span-2">
-                              <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2 flex items-center space-x-1.5">
-                                <Link className="w-3 h-3" />
-                                <span>聯盟行銷 / 購買連結 (Affiliate URL)</span>
-                              </label>
-                              <input
-                                type="url"
-                                value={editProductUrl}
-                                onChange={(e) => setEditProductUrl(e.target.value)}
-                                placeholder="https://www.momoshop.com.tw/..."
-                                className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-mono-data transition-all"
-                              />
-                            </div>
-
-                            {/* 商品圖片 URL */}
-                            <div className="md:col-span-2">
-                              <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">商品圖片 URL</label>
-                              <div className="flex gap-3">
-                                <input
-                                  type="url"
-                                  value={editProductImageUrl}
-                                  onChange={(e) => setEditProductImageUrl(e.target.value)}
-                                  placeholder="https://images.unsplash.com/..."
-                                  className="flex-1 bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-mono-data transition-all"
-                                />
-                                {editProductImageUrl && (
-                                  <div className="w-14 h-14 rounded-lg overflow-hidden border border-[#2C2C2A]/10 flex-shrink-0">
-                                    <img src={editProductImageUrl} alt="預覽" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                  </div>
-                                )}
+                            <div className="flex flex-col justify-between p-6 bg-[#5A6351]/5 border border-[#5A6351]/15 rounded-xl">
+                              <div>
+                                <span className="font-mono-data text-[10px] text-[#5A6351] font-bold tracking-widest block uppercase mb-1">DECISION A // AI 策展發布</span>
+                                <h4 className="font-serif font-bold text-sm text-[#2C2C2A] mb-2">發布下一期全新期刊</h4>
+                                <p className="text-xs text-[#2C2C2A]/50 font-sans-ui leading-relaxed mb-5">
+                                  聯網搜尋最新趨勢，調配極簡美學語調，發布第 {String(currentIssueNumber + 1).padStart(3, '0')} 期文章。
+                                </p>
                               </div>
+                              <button
+                                onClick={() => {
+                                  setNomadKeyword('');
+                                  setOfficeKeyword('');
+                                  setMinimalistTravelKeyword('');
+                                  setShowKeywordModal(true);
+                                }}
+                                disabled={isGenerating}
+                                className={`w-full text-white font-sans-ui text-xs font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition-all text-center flex items-center justify-center space-x-1.5 ${
+                                  isGenerating
+                                    ? 'bg-[#5A6351]/50 cursor-not-allowed'
+                                    : 'bg-[#5A6351] hover:bg-[#4E5646] cursor-pointer'
+                                }`}
+                              >
+                                <Sparkles className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
+                                <span>{isGenerating ? '正在聯網搜尋與 AI 寫作中...' : `發布 ISSUE ${String(currentIssueNumber + 1).padStart(3, '0')} 全新期刊`}</span>
+                              </button>
                             </div>
 
-                            {/* 分類標籤 */}
-                            <div>
-                              <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">分類標籤 (逗號分隔)</label>
-                              <input
-                                type="text"
-                                value={editProductTags}
-                                onChange={(e) => setEditProductTags(e.target.value)}
-                                placeholder="日常充電, 辦公室必備, 極簡旅行"
-                                className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui transition-all"
-                              />
-                              <p className="text-[10px] text-[#2C2C2A]/40 font-sans-ui mt-1">可用值：日常充電 / 辦公室必備 / 極簡旅行</p>
-                            </div>
-
-                            {/* 上架狀態 + 人氣商品 */}
-                            <div>
-                              <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">商品上架狀態</label>
-                              <div className="flex gap-2">
-                                {(['active', 'pending', 'draft'] as const).map((s) => (
-                                  <button
-                                    key={s}
-                                    type="button"
-                                    onClick={() => setEditProductStatus(s)}
-                                    className={`flex-1 px-3 py-2.5 rounded-lg text-xs font-sans-ui font-bold border transition-all cursor-pointer ${
-                                      editProductStatus === s
-                                        ? s === 'active' ? 'bg-emerald-500 text-white border-emerald-500'
-                                          : s === 'pending' ? 'bg-amber-400 text-white border-amber-400'
-                                          : 'bg-gray-400 text-white border-gray-400'
-                                        : 'bg-[#F4F4F3]/50 text-[#2C2C2A]/60 border-[#2C2C2A]/10 hover:bg-[#2C2C2A]/5'
-                                    }`}
+                            <div className="flex flex-col justify-between p-6 bg-[#2C2C2A]/4 border border-[#2C2C2A]/10 rounded-xl">
+                              <div>
+                                <span className="font-mono-data text-[10px] text-[#2C2C2A]/50 font-bold tracking-widest block uppercase mb-1">DECISION B // 系統重置</span>
+                                <h4 className="font-serif font-bold text-sm text-[#2C2C2A] mb-2">回復指定期刊設定</h4>
+                                <p className="text-xs text-[#2C2C2A]/50 font-sans-ui leading-relaxed mb-5">
+                                  將期刊系統重置回指定歷史期數，小於所選期的存檔保留，大於等於的清除。
+                                </p>
+                              </div>
+                              <div className="flex flex-col gap-3">
+                                <div className="flex items-center space-x-2 bg-white/70 border border-[#2C2C2A]/15 rounded-lg px-3 py-2">
+                                  <span className="font-sans-ui text-xs text-[#2C2C2A]/60 shrink-0">重置至：</span>
+                                  <select
+                                    value={rollbackIssueNum}
+                                    onChange={(e) => setRollbackIssueNum(parseInt(e.target.value, 10))}
+                                    className="flex-1 bg-transparent text-[#2C2C2A] text-xs font-sans-ui font-semibold focus:outline-none cursor-pointer"
                                   >
-                                    {s === 'active' ? '🟢 上架' : s === 'pending' ? '🟡 待審' : '⚫ 草稿'}
-                                  </button>
-                                ))}
-                              </div>
-                              {/* 人氣商品開關 */}
-                              <div className="mt-3">
+                                    {(() => {
+                                      const options = [];
+                                      for (let i = 25; i <= currentIssueNumber; i++) {
+                                        options.push(<option key={i} value={i}>第 {i} 期 (ISSUE {String(i).padStart(3, '0')})</option>);
+                                      }
+                                      return options;
+                                    })()}
+                                  </select>
+                                </div>
                                 <button
-                                  type="button"
-                                  onClick={() => setEditProductIsPopular(!editProductIsPopular)}
-                                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all cursor-pointer ${
-                                    editProductIsPopular
-                                      ? 'bg-amber-50 border-amber-300 text-amber-700'
-                                      : 'bg-[#F4F4F3]/50 border-[#2C2C2A]/10 text-[#2C2C2A]/50 hover:border-[#2C2C2A]/20'
-                                  }`}
+                                  onClick={() => handleRollbackToIssue(rollbackIssueNum)}
+                                  className="w-full bg-[#2C2C2A] hover:bg-[#3D3D3A] text-white font-sans-ui text-xs font-bold py-3 rounded-lg cursor-pointer transition-all"
                                 >
-                                  <div className="flex items-center space-x-2.5">
-                                    <Star className={`w-4 h-4 ${
-                                      editProductIsPopular ? 'text-amber-400 fill-amber-400' : 'text-[#2C2C2A]/30'
-                                    }`} />
-                                    <div className="text-left">
-                                      <p className="text-xs font-sans-ui font-bold">人氣精選 Popular Pick</p>
-                                      <p className="text-[10px] font-sans-ui opacity-70">影響前台商品卡片顯示金色徽章</p>
-                                    </div>
-                                  </div>
-                                  <div className={`w-10 h-5 rounded-full transition-all relative ${
-                                    editProductIsPopular ? 'bg-amber-400' : 'bg-[#2C2C2A]/15'
-                                  }`}>
-                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all ${
-                                      editProductIsPopular ? 'left-5.5' : 'left-0.5'
-                                    }`} />
-                                  </div>
+                                  確認重置至指定期刊
                                 </button>
                               </div>
                             </div>
+                          </div>
+                        </div>
 
-                            {/* 商品簡介描述 */}
-                            <div className="md:col-span-2">
-                              <label className="block text-xs font-mono-data text-[#2C2C2A]/55 uppercase tracking-wider mb-2">商品一句話特點描述</label>
-                              <textarea
-                                rows={3}
-                                value={editProductDescription}
-                                onChange={(e) => setEditProductDescription(e.target.value)}
-                                placeholder="簡明扼要地描述此商品最核心的功能亮點與適用族群..."
-                                className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui leading-relaxed transition-all resize-none"
-                              />
+                        {/* 專題文字編輯器 */}
+                        <div className="bg-white border border-[#2C2C2A]/10 rounded-2xl p-8 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                          <div className="flex items-center space-x-3 mb-6 pb-4 border-b border-[#2C2C2A]/5">
+                            <Feather className="w-5 h-5 text-[#5A6351]" />
+                            <span className="font-mono-data text-xs tracking-widest font-bold uppercase text-[#5A6351]">EDITORIAL DESK // 專題文字編輯室</span>
+                          </div>
+
+                          <p className="font-sans-ui text-xs text-[#2C2C2A]/60 leading-relaxed mb-5">
+                            在此可直接編輯當前第 <strong>{String(currentIssueNumber).padStart(3, '0')}</strong> 期的三篇 Active 精選專題。選擇標籤即可切換，修改後點擊儲存，前台文字即時更新。
+                          </p>
+
+                          {/* 專題 Tabs */}
+                          <div className="flex flex-col sm:flex-row gap-2 mb-6">
+                            {activeStories.map((story, index) => {
+                              const isSelected = story.id === selectedEditStoryId;
+                              return (
+                                <button
+                                  key={story.id}
+                                  type="button"
+                                  onClick={() => setSelectedEditStoryId(story.id)}
+                                  className={`flex-1 flex items-center justify-center space-x-2 px-4 py-2.5 rounded-lg text-xs font-sans-ui font-bold border transition-all cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-[#5A6351] text-[#F4F4F3] border-[#5A6351] shadow-sm'
+                                      : 'bg-[#F4F4F3]/50 text-[#2C2C2A]/70 hover:bg-[#2C2C2A]/5 border-[#2C2C2A]/10'
+                                  }`}
+                                >
+                                  <span>{story.icon}</span>
+                                  <span className="truncate max-w-[120px]">{story.title || `專題 0${index + 1}`}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {activeStories.find(s => s.id === selectedEditStoryId) && (() => {
+                            const story = activeStories.find(s => s.id === selectedEditStoryId)!;
+                            return (
+                              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                                {/* 左側編輯表單 */}
+                                <div className="lg:col-span-7 space-y-5 font-sans-ui text-xs text-[#2C2C2A]/80">
+                                  <div>
+                                    <label className="block text-xs font-mono-data text-[#2C2C2A]/60 uppercase tracking-wider mb-2">專題標題 (Title)</label>
+                                    <input
+                                      type="text"
+                                      value={editTitle}
+                                      onChange={(e) => setEditTitle(e.target.value)}
+                                      placeholder="請輸入專題標題"
+                                      className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-serif font-bold text-sm transition-all"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-mono-data text-[#2C2C2A]/60 uppercase tracking-wider mb-2">專題引言 / 摘要 (Description)</label>
+                                    <textarea
+                                      rows={3}
+                                      value={editDescription}
+                                      onChange={(e) => setEditDescription(e.target.value)}
+                                      placeholder="請輸入 1-2 句吸引讀者的引言"
+                                      className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui leading-relaxed transition-all resize-none"
+                                    />
+                                  </div>
+                                  
+                                  {/* 專題封面圖管理 (自帶高品質裁切上傳器) */}
+                                  <div className="bg-[#2C2C2A]/5 border border-[#2C2C2A]/10 rounded-xl p-4.5 space-y-4">
+                                    <label className="block text-xs font-mono-data text-[#2C2C2A]/60 uppercase tracking-wider font-bold">專題封面圖 (Cover Image)</label>
+                                    
+                                    <div className="flex flex-col sm:flex-row gap-4.5 items-start sm:items-center">
+                                      {/* 左側封面圖 1:1 縮圖預覽 */}
+                                      <div className="relative aspect-square w-full sm:w-[120px] overflow-hidden rounded-lg border border-[#2C2C2A]/10 bg-[#2C2C2A]/5 flex-shrink-0 shadow-inner group">
+                                        {editCoverImage ? (
+                                          <>
+                                            <img 
+                                              src={editCoverImage} 
+                                              alt="Cover Preview" 
+                                              className="w-full h-full object-cover animate-fade-in"
+                                              onError={(e) => {
+                                                const target = e.currentTarget;
+                                                const fallback = getFallbackImage(story.targetTag, 0);
+                                                if (target.src !== fallback) {
+                                                  target.src = fallback;
+                                                  setEditCoverImage(fallback);
+                                                }
+                                              }}
+                                            />
+                                            <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                              <span className="text-[10px] text-white font-sans-ui tracking-wider font-bold">編輯中</span>
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <div className="w-full h-full flex flex-col items-center justify-center text-[#2C2C2A]/30">
+                                            <span className="text-[10px] font-sans-ui">無封面圖片</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                      
+                                      {/* 右側操作控制區 */}
+                                      <div className="flex-1 w-full space-y-3.5">
+                                        <div className="flex flex-wrap gap-2.5">
+                                          {/* 本機檔案上傳按鈕 */}
+                                          <input 
+                                            type="file" 
+                                            id="story-cover-upload-input" 
+                                            accept="image/*" 
+                                            onChange={handleCropFileChange} 
+                                            className="hidden" 
+                                          />
+                                          <label 
+                                            htmlFor="story-cover-upload-input" 
+                                            className="cursor-pointer bg-[#5A6351] hover:bg-[#4E5646] text-white font-sans-ui text-[11px] font-bold px-3.5 py-2 rounded-lg transition-all shadow-sm flex items-center space-x-1.5"
+                                          >
+                                            <PlusCircle className="w-3.5 h-3.5 text-white" />
+                                            <span>上傳本機圖片</span>
+                                          </label>
+                                          
+                                          {/* 重新裁切按鈕 */}
+                                          {editCoverImage && (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setCropSrc(editCoverImage);
+                                                setCropZoom(1.0);
+                                                setCropPanX(0);
+                                                setCropPanY(0);
+                                                setShowCropModal(true);
+                                              }}
+                                              className="bg-[#2C2C2A]/10 hover:bg-[#2C2C2A]/15 text-[#2C2C2A]/80 font-sans-ui text-[11px] font-bold px-3.5 py-2 rounded-lg transition-all border border-[#2C2C2A]/10 flex items-center space-x-1.5 cursor-pointer"
+                                            >
+                                              <Edit3 className="w-3.5 h-3.5" />
+                                              <span>手動重新裁切</span>
+                                            </button>
+                                          )}
+                                        </div>
+                                        
+                                        {/* 線上網址載入 */}
+                                        <div className="space-y-1.5">
+                                          <span className="text-[10px] text-[#2C2C2A]/50 block">或貼上其他聯網圖片網址：</span>
+                                          <div className="flex gap-2">
+                                            <input 
+                                              type="text" 
+                                              value={storyUrlInput}
+                                              onChange={(e) => setStoryUrlInput(e.target.value)}
+                                              placeholder="https://images.unsplash.com/photo-..." 
+                                              className="flex-1 min-w-0 bg-white/70 border border-[#2C2C2A]/15 text-[#2C2C2A] text-[11px] px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui transition-all"
+                                            />
+                                            <button
+                                              type="button"
+                                              onClick={() => handleCropUrlLoad(storyUrlInput)}
+                                              className="bg-[#F4F4F3] hover:bg-[#EAEAEA] text-[#2C2C2A]/80 border border-[#2C2C2A]/15 font-sans-ui text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all flex items-center space-x-1 cursor-pointer flex-shrink-0"
+                                            >
+                                              <Link className="w-3 h-3" />
+                                              <span>載入</span>
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-xs font-mono-data text-[#2C2C2A]/60 uppercase tracking-wider mb-2">深度專題內文 (Content)</label>
+                                    <textarea
+                                      rows={10}
+                                      value={editContent}
+                                      onChange={(e) => setEditContent(e.target.value)}
+                                      placeholder="請輸入深度內文，段落間請以兩次換行隔開"
+                                      className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-serif leading-loose text-justify transition-all"
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={handleSaveStoryEdits}
+                                    className="w-full bg-[#5A6351] hover:bg-[#4E5646] text-white font-sans-ui text-xs font-bold py-3 px-4 rounded-lg cursor-pointer transition-all flex items-center justify-center space-x-2 shadow-md hover:shadow-lg"
+                                  >
+                                    <CheckCircle2 className="w-4 h-4 text-white" />
+                                    <span>儲存並發布此專題變更</span>
+                                  </button>
+                                </div>
+
+                                 {/* 右側：IG 貼文配圖生產器 (1080x1080) */}
+                                 <InstagramPostPreviewer
+                                   story={story}
+                                   currentIssueNumber={currentIssueNumber}
+                                   isEditing={story.id === selectedEditStoryId}
+                                   editTitle={editTitle}
+                                   editDescription={editDescription}
+                                   editCoverImage={editCoverImage}
+                                   onDownload={() => handleDownloadInstagramPost(story)}
+                                 />
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {/* ---- 商品區 ---- */}
+                    {adminActiveTab === 'products' && (
+                      <motion.div
+                        key="tab-products"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.3 }}
+                        className="space-y-6"
+                      >
+                        {/* 一鍵 AI 自動上架 */}
+                        <div className="bg-gradient-to-br from-[#5A6351]/8 to-[#5A6351]/3 border border-[#5A6351]/20 rounded-2xl p-8 shadow-[0_4px_24px_rgba(90,99,81,0.06)]">
+                          <div className="flex items-center space-x-3 mb-5 pb-4 border-b border-[#5A6351]/15">
+                            <div className="p-2 bg-[#5A6351] rounded-lg">
+                              <Sparkles className="w-4 h-4 text-white" />
+                            </div>
+                            <div>
+                              <span className="font-mono-data text-[10px] text-[#5A6351] font-bold tracking-widest uppercase block">AI AUTO-FILL // 一鍵 AI 自動上架</span>
+                              <p className="font-sans-ui text-xs text-[#2C2C2A]/60 mt-0.5">輸入商品名稱或貼上聯盟行銷網址，AI 自動生成所有欄位</p>
                             </div>
                           </div>
 
-                          {/* 儲存按鈕區 */}
-                          <div className="flex flex-col sm:flex-row gap-3 pt-3 border-t border-[#2C2C2A]/8">
+                          <div className="flex gap-3">
+                            <div className="flex-1 relative">
+                              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#2C2C2A]/30">
+                                <Link className="w-3.5 h-3.5" />
+                              </div>
+                              <input
+                                type="text"
+                                value={aiAutoFillInput}
+                                onChange={(e) => setAiAutoFillInput(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter' && !isAiAutoFilling) handleAiAutoFillProduct(); }}
+                                placeholder="輸入商品名稱（如：MOFT 隱形筆電支架）或貼上蝦皮/聯盟行銷網址"
+                                className="w-full bg-white border border-[#5A6351]/25 text-[#2C2C2A] text-xs pl-9 pr-4 py-3 rounded-xl focus:outline-none focus:border-[#5A6351] focus:ring-2 focus:ring-[#5A6351]/10 font-sans-ui transition-all placeholder:text-[#2C2C2A]/30"
+                              />
+                            </div>
                             <button
                               type="button"
-                              onClick={() => {
-                                if (selectedEditProductId === '__NEW__') {
-                                  // 新增商品
-                                  const newId = `prod-custom-${Date.now()}`;
-                                  const newProduct: Product = {
-                                    id: newId,
-                                    title_optimized: editProductTitle || '新商品',
-                                    price_display: editProductPrice || 'NT$ 0',
-                                    affiliate_url: editProductUrl || '#',
-                                    btn_text: editProductBtnText || '查看商品',
-                                    context_tags: editProductTags.split(',').map(t => t.trim()).filter(Boolean),
-                                    status: editProductStatus,
-                                    is_popular: editProductIsPopular,
-                                    image_url: editProductImageUrl || 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=600&q=80',
-                                    description: editProductDescription || ''
-                                  };
-                                  const next = [...editableProducts, newProduct];
-                                  setEditableProducts(next);
-                                  try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(next)); } catch(e) {}
-                                  setSelectedEditProductId(newId);
-                                  triggerToast(`🎉 新商品《${(editProductTitle || '新商品').slice(0,15)}》已成功新增並上架至前台 Shop！`);
-                                } else {
-                                  // 更新商品
-                                  const updatedProducts = editableProducts.map(p => {
-                                    if (p.id !== selectedEditProductId) return p;
-                                    return {
-                                      ...p,
-                                      title_optimized: editProductTitle,
-                                      price_display: editProductPrice,
-                                      affiliate_url: editProductUrl,
-                                      btn_text: editProductBtnText,
-                                      description: editProductDescription,
-                                      image_url: editProductImageUrl,
-                                      context_tags: editProductTags.split(',').map(t => t.trim()).filter(Boolean),
-                                      status: editProductStatus,
-                                      is_popular: editProductIsPopular
-                                    };
-                                  });
-                                  setEditableProducts(updatedProducts);
-                                  try {
-                                    localStorage.setItem('oasis_editable_products_v1', JSON.stringify(updatedProducts));
-                                  } catch(e) {}
-                                  triggerToast(`✨ 商品《${editProductTitle.slice(0, 15)}...》已成功更新並即時同步至前台！`);
-                                }
-                              }}
-                              className="flex-1 sm:flex-initial bg-[#5A6351] hover:bg-[#4E5646] text-white font-sans-ui text-xs font-bold py-3 px-6 rounded-lg cursor-pointer transition-all flex items-center justify-center space-x-2 shadow-md hover:shadow-lg"
+                              onClick={handleAiAutoFillProduct}
+                              disabled={isAiAutoFilling}
+                              className={`px-5 py-3 text-white text-xs font-sans-ui font-bold rounded-xl shadow-md transition-all flex items-center space-x-2 whitespace-nowrap ${
+                                isAiAutoFilling
+                                  ? 'bg-[#5A6351]/50 cursor-not-allowed'
+                                  : 'bg-[#5A6351] hover:bg-[#4E5646] cursor-pointer hover:shadow-lg'
+                              }`}
                             >
-                              <CheckCircle2 className="w-4 h-4" />
-                              <span>{selectedEditProductId === '__NEW__' ? '建立並上架新商品' : '儲存並發布此商品變更'}</span>
-                            </button>
-                            {selectedEditProductId !== '__NEW__' && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (confirmDeleteProductId === selectedEditProductId) {
-                                    const next = editableProducts.filter(p => p.id !== selectedEditProductId);
-                                    setEditableProducts(next);
-                                    try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(next)); } catch(e) {}
-                                    setSelectedEditProductId('');
-                                    setConfirmDeleteProductId('');
-                                    triggerToast(`🗑️ 商品《${editProductTitle.slice(0,12)}...》已已刪除，前台即時同步移除。`);
-                                  } else {
-                                    setConfirmDeleteProductId(selectedEditProductId);
-                                  }
-                                }}
-                                className={`px-5 py-3 text-xs font-sans-ui font-bold rounded-lg transition-all cursor-pointer flex items-center space-x-1.5 ${
-                                  confirmDeleteProductId === selectedEditProductId
-                                    ? 'bg-red-500 hover:bg-red-600 text-white border border-red-500'
-                                    : 'border border-red-200 hover:bg-red-50 text-red-400 hover:text-red-600'
-                                }`}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                <span>{confirmDeleteProductId === selectedEditProductId ? '再次點擊確認刪除' : '刪除此商品'}</span>
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => { setSelectedEditProductId(''); setConfirmDeleteProductId(''); }}
-                              className="px-5 py-3 border border-[#2C2C2A]/15 hover:bg-[#2C2C2A]/5 text-xs text-[#2C2C2A]/60 font-sans-ui font-semibold rounded-lg transition-colors cursor-pointer"
-                            >
-                              取消
+                              {isAiAutoFilling ? (
+                                <>
+                                  <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}>
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                  </motion.div>
+                                  <span>AI 生成中...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="w-3.5 h-3.5" />
+                                  <span>一鍵 AI 生成</span>
+                                </>
+                              )}
                             </button>
                           </div>
-                        </motion.div>
-                      )}
-
-                      {!selectedEditProductId && (
-                        <div className="border border-dashed border-[#5A6351]/20 rounded-xl p-8 text-center mt-4">
-                          <ShoppingBag className="w-10 h-10 mx-auto text-[#5A6351]/30 mb-3" />
-                          <p className="font-sans-ui text-sm text-[#2C2C2A]/40 font-medium">請從上方選取一款商品進行編輯，或點擊《新增商品》新增一筆</p>
-                          <p className="font-sans-ui text-xs text-[#2C2C2A]/30 mt-1">所有欄位修改即時同步，無需重新整理頁面</p>
+                          <p className="font-sans-ui text-[10px] text-[#5A6351]/70 mt-2.5 leading-relaxed">
+                            💡 AI 將自動填充：商品標題、一句話描述、建議價格、導購按鈕文字、分類標籤與 Unsplash 美學圖片 URL。如提供網址，將自動設為聯盟行銷連結。
+                          </p>
                         </div>
-                      )}
-                    </div>
-                  </div>
+
+                        {/* 商品編輯器主體 */}
+                        <div className="bg-white border border-[#2C2C2A]/10 rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden">
+                          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-8 pb-6 border-b border-[#2C2C2A]/8">
+                            <div className="flex items-start space-x-4">
+                              <div className="p-3 bg-[#5A6351]/10 rounded-xl text-[#5A6351]">
+                                <ShoppingBag className="w-6 h-6" />
+                              </div>
+                              <div>
+                                <span className="font-mono-data text-[10px] text-[#5A6351] font-bold tracking-widest uppercase block mb-1">SHOP EDITOR // 選物商城管理系統</span>
+                                <h3 className="text-xl font-bold font-serif text-[#2C2C2A]">商品內容即時編輯台</h3>
+                                <p className="font-sans-ui text-xs text-[#2C2C2A]/55 leading-relaxed mt-1">
+                                  選取商品後可即時修改所有欄位，儲存後前台即時同步。共 {editableProducts.length} 款商品。
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setEditableProducts(PRODUCTS);
+                                try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(PRODUCTS)); } catch(e) {}
+                                setSelectedEditProductId('');
+                                triggerToast('🔄 商品資料已重置為系統預設值。');
+                              }}
+                              className="text-[10px] font-sans-ui text-red-400 hover:text-red-600 font-semibold underline transition-colors cursor-pointer whitespace-nowrap"
+                            >
+                              重置所有商品為預設值
+                            </button>
+                          </div>
+
+                          <div className="p-8 pt-6">
+                            {/* 商品選取列表 */}
+                            <div className="mb-6">
+                              <div className="flex items-center justify-between mb-3">
+                                <div>
+                                  <h4 className="text-xs font-mono-data text-[#2C2C2A]/50 font-bold tracking-wider uppercase">Step 1 — 選擇要編輯的商品</h4>
+                                  <p className="text-[10px] font-sans-ui text-[#2C2C2A]/35 mt-0.5 flex items-center space-x-1">
+                                    <GripVertical className="w-3 h-3" />
+                                    <span>可拖曳排序，前台商品順序即時更新</span>
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedEditProductId('__NEW__');
+                                    setEditProductTitle('');
+                                    setEditProductPrice('');
+                                    setEditProductUrl('');
+                                    setEditProductBtnText('探索生活靈感');
+                                    setEditProductDescription('');
+                                    setEditProductImageUrl('');
+                                    setEditProductTags('');
+                                    setEditProductStatus('active');
+                                    setEditProductIsPopular(false);
+                                    setConfirmDeleteProductId('');
+                                  }}
+                                  className="inline-flex items-center space-x-1.5 bg-[#5A6351]/10 hover:bg-[#5A6351]/20 text-[#5A6351] text-xs font-sans-ui font-bold px-3.5 py-2 rounded-lg border border-[#5A6351]/20 transition-all cursor-pointer"
+                                >
+                                  <PlusCircle className="w-3.5 h-3.5" />
+                                  <span>新增商品</span>
+                                </button>
+                              </div>
+                              <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                                <SortableContext items={editableProducts.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                                  <div className="flex flex-col gap-2">
+                                    <AnimatePresence initial={false}>
+                                      {selectedEditProductId === '__NEW__' && (
+                                        <motion.div
+                                          initial={{ opacity: 0, height: 0 }}
+                                          animate={{ opacity: 1, height: 'auto' }}
+                                          exit={{ opacity: 0, height: 0 }}
+                                          transition={{ duration: 0.3 }}
+                                          className="overflow-hidden"
+                                        >
+                                          {renderProductEditForm(true)}
+                                        </motion.div>
+                                      )}
+                                    </AnimatePresence>
+
+                                    {editableProducts.map((product) => {
+                                      const isSelected = product.id === selectedEditProductId;
+                                      const isPendingDelete = confirmDeleteProductId === product.id;
+                                      return (
+                                        <div key={product.id} className="space-y-1">
+                                          <SortableProductRow
+                                            product={product}
+                                            isSelected={isSelected}
+                                            isPendingDelete={isPendingDelete}
+                                            onSelect={() => {
+                                              if (isSelected) {
+                                                setSelectedEditProductId('');
+                                              } else {
+                                                setSelectedEditProductId(product.id);
+                                                setEditProductTitle(product.title_optimized);
+                                                setEditProductPrice(product.price_display);
+                                                setEditProductUrl(product.affiliate_url);
+                                                setEditProductBtnText(product.btn_text);
+                                                setEditProductDescription(product.description);
+                                                setEditProductImageUrl(product.image_url);
+                                                setEditProductTags(product.context_tags.join(', '));
+                                                setEditProductStatus(product.status);
+                                                setEditProductIsPopular(product.is_popular ?? false);
+                                                setConfirmDeleteProductId('');
+                                              }
+                                            }}
+                                            onDeleteRequest={() => setConfirmDeleteProductId(product.id)}
+                                            onDeleteConfirm={() => {
+                                              const next = editableProducts.filter(p => p.id !== product.id);
+                                              setEditableProducts(next);
+                                              try { localStorage.setItem('oasis_editable_products_v1', JSON.stringify(next)); } catch(e) {}
+                                              setConfirmDeleteProductId('');
+                                              if (selectedEditProductId === product.id) setSelectedEditProductId('');
+                                              triggerToast(`🗑️ 商品《${product.title_optimized.slice(0,12)}...》已刪除，前台即時同步移除。`);
+                                            }}
+                                            onDeleteCancel={() => setConfirmDeleteProductId('')}
+                                          />
+                                          <AnimatePresence initial={false}>
+                                            {isSelected && (
+                                              <motion.div
+                                                initial={{ opacity: 0, height: 0 }}
+                                                animate={{ opacity: 1, height: 'auto' }}
+                                                exit={{ opacity: 0, height: 0 }}
+                                                transition={{ duration: 0.3 }}
+                                                className="overflow-hidden"
+                                              >
+                                                {renderProductEditForm(false)}
+                                              </motion.div>
+                                            )}
+                                          </AnimatePresence>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </SortableContext>
+                              </DndContext>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 待審查模塊 */}
+                        <div className="bg-white border border-[#2C2C2A]/10 rounded-2xl p-8 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                          <div className="flex items-center space-x-3 text-[#2C2C2A] mb-5 pb-4 border-b border-[#2C2C2A]/5">
+                            <CheckCircle2 className="w-5 h-5 text-[#5A6351]" />
+                            <span className="font-mono-data text-xs tracking-widest font-bold uppercase text-[#5A6351]">HUMAN-IN-THE-LOOP // 半自動審核佇列</span>
+                          </div>
+                          <p className="font-sans-ui text-xs text-[#2C2C2A]/60 leading-relaxed mb-4">
+                            此處展示狀態為 <code className="bg-[#2C2C2A]/10 px-1 py-0.5 rounded text-[11px] font-mono-data text-[#2C2C2A]">status: "pending"</code> 的商品，供團隊進行上架審核。
+                          </p>
+                          {editableProducts.filter(p => p.status === 'pending').length === 0 ? (
+                            <div className="border border-dashed border-[#2C2C2A]/15 rounded-xl p-6 text-center text-xs text-[#2C2C2A]/40 font-sans-ui italic">
+                              暫無審查中 (Pending) 的商品待處理。AI 智理引擎狀態良好。
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {editableProducts.filter(p => p.status === 'pending').map(p => (
+                                <div key={p.id} className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                  <span className="text-xs font-sans-ui font-semibold text-[#2C2C2A]">{p.title_optimized}</span>
+                                  <span className="text-[10px] font-mono-data text-amber-600 font-bold">PENDING</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {/* ---- 數據區 ---- */}
+                    {adminActiveTab === 'stats' && (
+                      <motion.div
+                        key="tab-stats"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.3 }}
+                        className="space-y-6"
+                      >
+                        <div className="bg-white border border-[#2C2C2A]/10 rounded-2xl p-8 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-[#2C2C2A]/5 mb-6">
+                            <div className="flex items-center space-x-3">
+                              <Database className="w-5 h-5 text-[#5A6351]" />
+                              <span className="font-mono-data text-xs tracking-widest font-bold uppercase text-[#5A6351]">REAL-TIME CTR ANALYTICS // 實際點擊數據統計中心</span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                const defaultStoryClicks: {[key: string]: number} = {};
+                                const allS = [...activeStories, ...archivedStories, ...NEXT_ISSUE_STORIES];
+                                allS.forEach(s => { defaultStoryClicks[s.id] = 0; });
+                                setStoryClicks(defaultStoryClicks);
+                                const defaultProdClicks: {[key: string]: number} = {};
+                                PRODUCTS.forEach(p => { defaultProdClicks[p.id] = 0; });
+                                setProductClicks(defaultProdClicks);
+                                triggerToast('🔄 智理統計數據已成功重置為預設初始值。');
+                              }}
+                              className="text-[10px] font-sans-ui text-[#5A6351] hover:text-[#4E5646] font-semibold underline transition-colors cursor-pointer"
+                            >
+                              重置實際點擊統計
+                            </button>
+                          </div>
+
+                          <p className="font-sans-ui text-xs text-[#2C2C2A]/60 leading-relaxed mb-6">
+                            此模組統計讀者在 Oasis Lab. 產生的真實對話與行文軌跡。所有查看專題、前往品牌合作通路等<strong>實際點擊數</strong>均被儲存，並與隨機偏移量彙整，演算出前台呈現的高質感補給熱度。
+                          </p>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                            <div className="bg-[#5A6351]/5 border border-[#5A6351]/15 rounded-xl p-5">
+                              <span className="font-mono-data text-[10px] text-[#5A6351] font-bold block mb-1 uppercase">TOTAL ACTUAL STORY CLICKS / 專題點擊</span>
+                              <div className="text-3xl font-mono-data font-black text-[#5A6351] flex items-baseline space-x-1.5">
+                                <span>{Object.values(storyClicks).reduce((a: number, b: number) => a + b, 0)}</span>
+                                <span className="text-xs font-sans-ui font-normal text-[#2C2C2A]/50">次實際點擊</span>
+                              </div>
+                            </div>
+                            <div className="bg-[#2C2C2A]/4 border border-[#2C2C2A]/10 rounded-xl p-5">
+                              <span className="font-mono-data text-[10px] text-[#2C2C2A]/60 font-bold block mb-1 uppercase">TOTAL ACTUAL PRODUCT CLICKS / 商品點擊</span>
+                              <div className="text-3xl font-mono-data font-black text-[#2C2C2A] flex items-baseline space-x-1.5">
+                                <span>{Object.values(productClicks).reduce((a: number, b: number) => a + b, 0)}</span>
+                                <span className="text-xs font-sans-ui font-normal text-[#2C2C2A]/50">次實際查看</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-6">
+                            <div>
+                              <h4 className="text-xs font-mono-data text-[#5A6351] font-bold tracking-wider uppercase mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                                <span>1. 專題故事點閱明細 (Stories Views)</span>
+                                <span className="text-[10px] font-sans-ui font-normal text-[#2C2C2A]/40">點擊熱度算法：(實際點擊數 + 隨機 1XXX)</span>
+                              </h4>
+                              <div className="overflow-x-auto border border-[#2C2C2A]/10 rounded-xl bg-[#F4F4F3]/30">
+                                <table className="w-full text-left font-sans-ui text-xs text-[#2C2C2A]">
+                                  <thead>
+                                    <tr className="bg-[#F4F4F3] border-b border-[#2C2C2A]/10 text-[#2C2C2A]/60 text-[10px] uppercase font-bold tracking-wider">
+                                      <th className="p-3">專題 ID / 名稱</th>
+                                      <th className="p-3 text-center">實際點閱 (真實)</th>
+                                      <th className="p-3 text-center">隨機偏移 (Offset)</th>
+                                      <th className="p-3 text-right">前台顯示數</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-[#2C2C2A]/5 font-mono-data">
+                                    {allStories.map(story => {
+                                      const real = storyClicks[story.id] || 0;
+                                      const offset = storyOffsets[story.id] || 1000;
+                                      return (
+                                        <tr key={story.id} className="hover:bg-[#F4F4F3]/80">
+                                          <td className="p-3 font-sans-ui font-medium">
+                                            <div className="font-bold flex items-center space-x-1.5 text-xs text-[#2C2C2A]">
+                                              <span>{story.icon}</span>
+                                              <span className="line-clamp-1">{story.title}</span>
+                                            </div>
+                                            <div className="text-[9px] font-mono-data text-[#2C2C2A]/40 leading-none mt-0.5">#{story.id}</div>
+                                          </td>
+                                          <td className="p-3 text-center font-bold text-emerald-600">{real}</td>
+                                          <td className="p-3 text-center text-[#2C2C2A]/40 font-normal">+{offset}</td>
+                                          <td className="p-3 text-right font-black text-[#5A6351]">{(real + offset).toLocaleString()}</td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+
+                            <div>
+                              <h4 className="text-xs font-mono-data text-[#5A6351] font-bold tracking-wider uppercase mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                                <span>2. 選物導購點擊明細 (Products Clicks)</span>
+                                <span className="text-[10px] font-sans-ui font-normal text-[#2C2C2A]/40">查看點擊算法：(實際點擊 + (500-999隨機))</span>
+                              </h4>
+                              <div className="overflow-x-auto border border-[#2C2C2A]/10 rounded-xl bg-[#F4F4F3]/30 font-sans-ui">
+                                <table className="w-full text-left font-sans-ui text-xs text-[#2C2C2A]">
+                                  <thead>
+                                    <tr className="bg-[#F4F4F3] border-b border-[#2C2C2A]/10 text-[#2C2C2A]/60 text-[10px] uppercase font-bold tracking-wider">
+                                      <th className="p-3">嚴選單品名稱</th>
+                                      <th className="p-3 text-center">實際查看 (真實)</th>
+                                      <th className="p-3 text-center">隨機偏移 (Offset)</th>
+                                      <th className="p-3 text-right">前台顯示數</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-[#2C2C2A]/5 font-mono-data">
+                                    {editableProducts.map(product => {
+                                      const real = productClicks[product.id] || 0;
+                                      const offset = productOffsets[product.id] || 500;
+                                      return (
+                                        <tr key={product.id} className="hover:bg-[#F4F4F3]/80">
+                                          <td className="p-3 font-sans-ui font-medium">
+                                            <div className="font-bold text-[#2C2C2A] text-xs line-clamp-1">{product.title_optimized}</div>
+                                            <div className="text-[9px] font-mono-data text-[#2C2C2A]/40 leading-none mt-0.5">ID: {product.id}</div>
+                                          </td>
+                                          <td className="p-3 text-center font-bold text-amber-600">{real}</td>
+                                          <td className="p-3 text-center text-[#2C2C2A]/40 font-normal font-mono-data">+{offset}</td>
+                                          <td className="p-3 text-right font-black text-[#5A6351]">{(real + offset).toLocaleString()}</td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
               )}
 
-              <div className="flex justify-center mt-12 pt-6 border-t border-[#2C2C2A]/5">
+              <div className="flex justify-center mt-10 pt-6 border-t border-[#2C2C2A]/5">
                 <button
                   onClick={() => {
                     setCurrentView('cover');
@@ -2563,12 +3420,19 @@ export default function App() {
                     </div>
 
                     {/* 專題主形象大圖 */}
-                    <div className="w-full h-64 md:h-100 rounded-xl overflow-hidden shadow-md relative">
+                    <div className="w-full aspect-square max-w-[480px] mx-auto rounded-xl overflow-hidden shadow-md relative">
                       <img 
                         src={currentStory.coverImage} 
                         alt={currentStory.title} 
                         className="w-full h-full object-cover"
                         referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          const fallback = getFallbackImage(currentStory.targetTag, 0);
+                          if (target.src !== fallback) {
+                            target.src = fallback;
+                          }
+                        }}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                     </div>
@@ -2834,108 +3698,40 @@ export default function App() {
 
       {/* 策展關鍵字設定氣泡彈窗 */}
       <AnimatePresence>
-        {showKeywordModal && (
-          <motion.div
-            id="keyword-modal"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2C2C2A]/60 backdrop-blur-md"
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 15 }}
-              className="bg-[#F4F4F3] border border-[#2C2C2A]/15 rounded-2xl p-6 md:p-8 max-w-md w-full shadow-2xl font-serif text-[#2C2C2A]"
-            >
-              <div className="flex justify-between items-start mb-6">
-                <div className="flex space-x-2 items-center text-[#5A6351]">
-                  <Sparkles className="w-5 h-5 animate-pulse" />
-                  <span className="font-sans-ui text-xs tracking-widest font-bold uppercase">AI Topic Customization</span>
-                </div>
-                <button
-                  onClick={() => setShowKeywordModal(false)}
-                  className="p-1 rounded-full hover:bg-[#2C2C2A]/5 transition-colors text-[#2C2C2A]/60 hover:text-[#2C2C2A] cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <h3 className="text-xl font-bold mb-2 tracking-tight">自訂最新一期專題關鍵字</h3>
-              <p className="font-sans-ui text-xs text-[#2C2C2A]/60 mb-6 leading-relaxed">
-                您可以為下一期 (ISSUE {String(currentIssueNumber + 1).padStart(3, '0')}) 的三個主題指定專題關鍵字。AI 將依您填寫的關鍵字為核心進行深度策展與寫作；若留白，則依預設美學自由生成。
-              </p>
-
-              <div className="space-y-4 font-sans-ui text-xs text-[#2C2C2A]/80 mb-6">
-                <div>
-                  <label className="block font-bold mb-1.5 text-[#2C2C2A]/70">
-                    💻 游牧數位 (Digital Nomad) 專題關鍵字
-                  </label>
-                  <input
-                    type="text"
-                    value={nomadKeyword}
-                    onChange={(e) => setNomadKeyword(e.target.value)}
-                    placeholder="例如：人體工學機械鍵盤、輕量降噪耳機（選填）"
-                    className="w-full bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3 py-2.5 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui placeholder:text-[#2C2C2A]/30 transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold mb-1.5 text-[#2C2C2A]/70">
-                    ☕ 辦公美學 (Office Aesthetics) 專題關鍵字
-                  </label>
-                  <input
-                    type="text"
-                    value={officeKeyword}
-                    onChange={(e) => setOfficeKeyword(e.target.value)}
-                    placeholder="例如：原木升降桌、極簡手沖咖啡壺（選填）"
-                    className="w-full bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3 py-2.5 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui placeholder:text-[#2C2C2A]/30 transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold mb-1.5 text-[#2C2C2A]/70">
-                    ✈️ 極簡旅行 (Minimalist Travel) 專題關鍵字
-                  </label>
-                  <input
-                    type="text"
-                    value={minimalistTravelKeyword}
-                    onChange={(e) => setMinimalistTravelKeyword(e.target.value)}
-                    placeholder="例如：耐磨防潑水雙肩包、超輕量盥洗包（選填）"
-                    className="w-full bg-white border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3 py-2.5 rounded-lg focus:outline-none focus:border-[#5A6351] font-sans-ui placeholder:text-[#2C2C2A]/30 transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="bg-[#5A6351]/5 border-l-2 border-[#5A6351] p-3 text-[11px] font-sans-ui text-[#5A6351]/90 rounded mb-6 leading-relaxed">
-                💡 填寫關鍵字可以精準引導 AI 創作出您喜愛的好物故事，為您客製專屬的生活美學提案。
-              </div>
-
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setShowKeywordModal(false)}
-                  className="flex-1 border border-[#2C2C2A]/15 hover:bg-[#2C2C2A]/5 py-2.5 rounded-lg text-center font-sans-ui text-xs text-[#2C2C2A]/70 transition-colors cursor-pointer"
-                >
-                  取消
-                </button>
-                <button
-                  onClick={() => {
-                    setShowKeywordModal(false);
-                    handleGenerateNextIssue({
-                      nomad: nomadKeyword,
-                      office: officeKeyword,
-                      minimalistTravel: minimalistTravelKeyword
-                    });
-                  }}
-                  className="flex-1 bg-[#5A6351] hover:bg-[#4E5646] text-[#F4F4F3] py-2.5 rounded-lg text-center font-sans-ui font-medium text-xs transition-colors cursor-pointer flex items-center justify-center space-x-1.5"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>開始 AI 策展生成</span>
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
+        <KeywordModal
+          isOpen={showKeywordModal}
+          currentIssueNumber={currentIssueNumber}
+          nomadKeyword={nomadKeyword}
+          officeKeyword={officeKeyword}
+          minimalistTravelKeyword={minimalistTravelKeyword}
+          setNomadKeyword={setNomadKeyword}
+          setOfficeKeyword={setOfficeKeyword}
+          setMinimalistTravelKeyword={setMinimalistTravelKeyword}
+          onClose={() => setShowKeywordModal(false)}
+          onGenerate={(keywords) => {
+            setShowKeywordModal(false);
+            handleGenerateNextIssue(keywords);
+          }}
+        />
+      </AnimatePresence>
+ 
+      {/* 1:1 專題封面圖自訂裁切器彈窗 */}
+      <AnimatePresence>
+        <CropModal
+          isOpen={showCropModal}
+          cropSrc={cropSrc}
+          cropZoom={cropZoom}
+          cropPanX={cropPanX}
+          cropPanY={cropPanY}
+          setCropZoom={setCropZoom}
+          onClose={() => setShowCropModal(false)}
+          onApply={handleApplyCrop}
+          onMouseDown={handleCropMouseDown}
+          onMouseMove={handleCropMouseMove}
+          onTouchStart={handleCropTouchStart}
+          onTouchMove={handleCropTouchMove}
+          onMouseUp={handleCropEnd}
+        />
       </AnimatePresence>
 
       {/* 底部浮動 PWA 快捷手冊 */}
