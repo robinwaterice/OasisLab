@@ -48,7 +48,9 @@ import {
   Edit3,
   Link,
   GripVertical,
-  Star
+  Star,
+  Copy,
+  FileJson
 } from 'lucide-react';
 import { Story, Product } from './types';
 import { STORIES, HISTORICAL_STORIES, NEXT_ISSUE_STORIES, PRODUCTS } from './data';
@@ -1282,6 +1284,54 @@ export default function App() {
       return s;
     }));
     triggerToast(`✨ 已成功更新專題《${editTitle}》的文字與封面圖內容，並即時發布至前台！`);
+  };
+
+  // 一鍵複製所有編輯內容為 Markdown 格式
+  const handleCopyAsMarkdown = () => {
+    const story = activeStories.find(s => s.id === selectedEditStoryId);
+    if (!story) return;
+
+    const markdownText = `# 專題標題：${editTitle}
+## 副標題 / 期刊：${story.subtitle || ''}
+- 分類標籤：${story.targetTag || ''} ${story.icon || ''}
+- 封面圖連結：${editCoverImage}
+
+> 【專題引言 / 摘要】
+> ${editDescription}
+
+---
+
+${editContent}`;
+
+    try {
+      navigator.clipboard.writeText(markdownText);
+      triggerToast('📋 已複製 Markdown 格式的專題內容至剪貼簿！');
+    } catch (e) {
+      triggerToast('⚠️ 複製失敗，請手動複製內容。');
+    }
+  };
+
+  // 一鍵複製所有編輯內容為 JSON 格式
+  const handleCopyAsJson = () => {
+    const story = activeStories.find(s => s.id === selectedEditStoryId);
+    if (!story) return;
+
+    const jsonObj = {
+      title: editTitle,
+      subtitle: story.subtitle || '',
+      targetTag: story.targetTag || '',
+      icon: story.icon || '',
+      coverImage: editCoverImage,
+      description: editDescription,
+      content: editContent
+    };
+
+    try {
+      navigator.clipboard.writeText(JSON.stringify(jsonObj, null, 2));
+      triggerToast('📋 已複製 JSON 格式的專題內容至剪貼簿！');
+    } catch (e) {
+      triggerToast('⚠️ 複製失敗，請手動複製內容。');
+    }
   };
 
   // 設定編輯器預設選取的專題
@@ -2948,6 +2998,25 @@ ${inputVal}
                                       className="w-full bg-[#F4F4F3]/50 border border-[#2C2C2A]/15 text-[#2C2C2A] text-xs px-3.5 py-3 rounded-lg focus:outline-none focus:border-[#5A6351] font-serif leading-loose text-justify transition-all"
                                     />
                                   </div>
+                                  <div className="grid grid-cols-2 gap-3 mb-3">
+                                    <button
+                                      type="button"
+                                      onClick={handleCopyAsMarkdown}
+                                      className="bg-[#2C2C2A]/5 hover:bg-[#5A6351]/10 hover:text-[#5A6351] text-[#2C2C2A]/70 font-sans-ui text-xs font-bold py-2.5 px-4 rounded-lg transition-all border border-[#2C2C2A]/10 flex items-center justify-center space-x-1.5 cursor-pointer shadow-sm hover:shadow-md"
+                                    >
+                                      <Copy className="w-3.5 h-3.5" />
+                                      <span>複製 Markdown 格式</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={handleCopyAsJson}
+                                      className="bg-[#2C2C2A]/5 hover:bg-[#5A6351]/10 hover:text-[#5A6351] text-[#2C2C2A]/70 font-sans-ui text-xs font-bold py-2.5 px-4 rounded-lg transition-all border border-[#2C2C2A]/10 flex items-center justify-center space-x-1.5 cursor-pointer shadow-sm hover:shadow-md"
+                                    >
+                                      <FileJson className="w-3.5 h-3.5" />
+                                      <span>複製 JSON 格式</span>
+                                    </button>
+                                  </div>
+
                                   <button
                                     type="button"
                                     onClick={handleSaveStoryEdits}
