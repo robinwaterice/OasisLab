@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oasis-lab-cache-v1';
+const CACHE_NAME = 'oasis-lab-cache-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -19,6 +19,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
+            console.log('Deleting old cache:', key);
             return caches.delete(key);
           }
         })
@@ -41,20 +42,47 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200 && event.request.method === 'GET') {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+  const url = new URL(event.request.url);
+  const isHTML = event.request.mode === 'navigate' || 
+                 event.request.headers.get('accept')?.includes('text/html') ||
+                 url.pathname === '/' ||
+                 url.pathname === '/index.html';
+
+  if (isHTML) {
+    // Network-First Strategy for HTML pages: always get fresh content when online
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          // If offline, serve from cache fallback
+          return caches.match(event.request);
+        })
+    );
+  } else {
+    // Cache-First Strategy for other static assets (JS, CSS, images, etc.)
+    event.respondWith(
+      caches.match(event.request).then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
         }
-        return networkResponse;
-      }).catch(() => {
-        // Fallback or ignore for network errors
-      });
-      return cachedResponse || fetchPromise;
-    })
-  );
+        return fetch(event.request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200 && event.request.method === 'GET') {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return networkResponse;
+        });
+      })
+    );
+  }
 });
