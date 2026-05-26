@@ -69,18 +69,19 @@ export default function InstagramPostPreviewer({
         <Smartphone className="w-4 h-4" />
         <span className="font-mono-data text-xs tracking-wider font-bold uppercase text-[#5A6351]">INSTAGRAM POST GENERATOR // 官方社群貼文配圖</span>
       </div>
+
       <p className="font-sans-ui text-[11px] text-[#2C2C2A]/65 leading-relaxed mb-5 self-start">
-        此區域為專題產生時同步渲染的 <strong>官方 IG 貼文專用配圖 (1080x1080 正方形)</strong>。配圖的文字會隨著左側您的編輯在下方預覽中<strong>即時同步更新</strong>。字體、品牌邊框和排版細節均符合 Oasis Lab. 的生活美學風格，確保官方帳號視覺的一致性。
+        此區域為專題產生時同步渲染的 <strong>官方 IG 貼文專用配圖 (1080x1350, 比例 4:5)</strong>。配圖的文字會隨著左側您的編輯在下方預覽中<strong>即時同步更新</strong>。字體、品牌邊框和排版細節均符合 Oasis Lab. 的生活美學風格，確保官方帳號視覺的一致性。
       </p>
 
       {/* IG 貼文卡片預覽 */}
       <div className="mb-5 flex justify-center w-full">
-        <div className="w-full max-w-[340px] aspect-square relative bg-[#2C2C2A] rounded-xl shadow-lg overflow-hidden border border-[#2C2C2A]/15 select-none group">
+        <div className="w-full max-w-[340px] aspect-[4/5] relative bg-[#2C2C2A] rounded-xl shadow-lg overflow-hidden border border-[#2C2C2A]/15 select-none group">
           {/* 專題封面底圖 */}
           <img 
             src={displayImage} 
             alt="IG Post BG" 
-            className="absolute inset-0 w-full h-full object-cover opacity-80 transition-transform duration-700 group-hover:scale-103"
+            className="absolute inset-0 w-full h-full object-cover opacity-80"
             referrerPolicy="no-referrer"
             onError={() => {
               const fallback = getFallbackImage(story.targetTag, 0);
@@ -140,7 +141,7 @@ export default function InstagramPostPreviewer({
         className="w-full bg-[#2C2C2A] hover:bg-[#1E1E1D] text-[#F4F4F3] font-sans-ui text-xs font-bold py-3 px-4 rounded-lg cursor-pointer transition-all flex items-center justify-center space-x-2 shadow-md hover:shadow-lg"
       >
         <Download className="w-4 h-4 text-[#F4F4F3]" />
-        <span>下載官方 IG 高畫質貼文圖片 (1080x1080)</span>
+        <span>下載官方 IG 高畫質貼文圖片 (1080x1350, 比例 4:5)</span>
       </button>
     </div>
   );

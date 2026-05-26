@@ -168,21 +168,21 @@ export default function App() {
   const [currentView, setCurrentView] = useState<string>('cover');
   const [activeStories, setActiveStories] = useState<Story[]>(() => {
     try {
-      const saved = localStorage.getItem('oasis_active_stories_v1');
+      const saved = localStorage.getItem('oasis_active_stories_v2');
       if (saved) return JSON.parse(saved) as Story[];
     } catch (e) {}
     return STORIES;
   });
   const [archivedStories, setArchivedStories] = useState<Story[]>(() => {
     try {
-      const saved = localStorage.getItem('oasis_archived_stories_v1');
+      const saved = localStorage.getItem('oasis_archived_stories_v2');
       if (saved) return JSON.parse(saved) as Story[];
     } catch (e) {}
     return HISTORICAL_STORIES;
   });
   const [currentIssueNumber, setCurrentIssueNumber] = useState<number>(() => {
     try {
-      const saved = localStorage.getItem('oasis_issue_number_v1');
+      const saved = localStorage.getItem('oasis_issue_number_v2');
       if (saved) return parseInt(saved, 10);
     } catch (e) {}
     return 25;
@@ -351,8 +351,8 @@ export default function App() {
     const offsets: {[key: string]: number} = {};
     const allS = (() => {
       try {
-        const savedActive = localStorage.getItem('oasis_active_stories_v1');
-        const savedArchived = localStorage.getItem('oasis_archived_stories_v1');
+        const savedActive = localStorage.getItem('oasis_active_stories_v2');
+        const savedArchived = localStorage.getItem('oasis_archived_stories_v2');
         let combined = [...STORIES, ...HISTORICAL_STORIES, ...NEXT_ISSUE_STORIES];
         if (savedActive) combined = combined.concat(JSON.parse(savedActive) as Story[]);
         if (savedArchived) combined = combined.concat(JSON.parse(savedArchived) as Story[]);
@@ -450,26 +450,26 @@ export default function App() {
   // 持久化 currentIssueNumber
   useEffect(() => {
     try {
-      localStorage.setItem('oasis_issue_number_v1', currentIssueNumber.toString());
+      localStorage.setItem('oasis_issue_number_v2', currentIssueNumber.toString());
     } catch (e) {}
   }, [currentIssueNumber]);
 
   // 💾 持久化儲存：AI 生成的專題與期數，避免重整後消失
   useEffect(() => {
     try {
-      localStorage.setItem('oasis_active_stories_v1', JSON.stringify(activeStories));
+      localStorage.setItem('oasis_active_stories_v2', JSON.stringify(activeStories));
     } catch (e) {}
   }, [activeStories]);
 
   useEffect(() => {
     try {
-      localStorage.setItem('oasis_archived_stories_v1', JSON.stringify(archivedStories));
+      localStorage.setItem('oasis_archived_stories_v2', JSON.stringify(archivedStories));
     } catch (e) {}
   }, [archivedStories]);
 
   useEffect(() => {
     try {
-      localStorage.setItem('oasis_issue_number_v1', String(currentIssueNumber));
+      localStorage.setItem('oasis_issue_number_v2', String(currentIssueNumber));
     } catch (e) {}
   }, [currentIssueNumber]);
 
@@ -875,12 +875,12 @@ export default function App() {
 
 
 
-  // 高畫質 1080x1080 官方 IG 貼文配圖生成並下載函數
+  // 高畫質 1080x1350 官方 IG 貼文配圖生成並下載函數
   const handleDownloadInstagramPost = (story: Story) => {
-    // 建立一個離線的 1080x1080 Canvas 進行高解析度渲染
+    // 建立一個離線的 1080x1350 Canvas 進行高解析度渲染
     const canvas = document.createElement('canvas');
     canvas.width = 1080;
-    canvas.height = 1080;
+    canvas.height = 1350;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -1096,7 +1096,7 @@ export default function App() {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.src = story.coverImage;
-    triggerToast('⏳ 正在以 Oasis Lab. 品牌語彙轉譯與生成官方 IG 貼文圖片 (1080x1080)...');
+    triggerToast('⏳ 正在以 Oasis Lab. 品牌語彙轉譯與生成官方 IG 貼文圖片 (1080x1350)...');
 
     img.onload = () => {
       performDrawing(img);
@@ -1207,7 +1207,7 @@ export default function App() {
 
 【寫作指導風格與要求】：
 - 文字風格必須是散發文藝氣息的繁體中文，行文高雅精緻，段落分明，富有生活儀式感。
-- 每篇文章的 'content' 欄位必須是長篇深度文章（至少 3-4 個段落），不要有任何 markdown 代碼標記（如 \`\`\` 等），使用換行符 (\\n) 分割段落。
+- 每篇文章的 'content' 欄位必須是【極致詳盡的超長篇深度文章（至少 9-12 個段落，總字數必須為原本的三倍以上，約 1000-1500 字左右）】，深入探討每個設計器物、生活儀式與精神核心，不要有任何 markdown 代碼標記（如 \`\`\` 等），使用雙換行符 (\\n\\n) 分割段落，確保前台排版美觀。
 - **【標題極簡與高度多樣化要求】**：在撰寫文章標題 ("title") 時，**請絕對不要包含任何年份、數字（例如 2026、今年、5個、3個等）或千篇一律的「OO提案」、「OO指引」、「OO必備」等容易重複的公式化標題**。請保持標題的高度多樣性與深刻意境，善用隱喻、動詞與留白，使其呈現出富有人文呼吸感與哲學思辨的文藝氣息。
 【標題美學靈感範例（供參考並激發靈感，請勿直接複製）：】
   * 哲思與內心留白類：《減法，是為了給心靈騰出空間》、《安靜的底色》、《日常的留白》、《流動的精神聖殿》、《在無事中，聽見時間的深度》
@@ -1231,7 +1231,7 @@ export default function App() {
   "subtitle": "STORY 0X // [主題名稱]",
   "title": "文藝雅緻且富有哲思的標題",
   "description": "1-2 句極具吸引力的摘要說明",
-  "content": "深度極簡慢活美學文章（至少 3-4 個段落，行文溫潤優雅，段落間用 \\n 隔開，不要帶額外 markdown 標記）",
+  "content": "極致詳盡的超長篇深度美學文章（至少 9-12 個段落，總字數為原本的三倍以上，約 1000-1500 字，行文溫潤優雅，段落間用 \\n\\n 隔開，不要帶額外 markdown 標記）",
   "targetTag": "日常充電 或 辦公室必備 或 極簡旅行 (必須完全一致，不能寫其他內容)",
   "coverImagePrompt": "依據上方要求所寫的純英文高質感圖片提示詞",
   "author": "編輯姓名，如 '主編・Elian'",
@@ -3416,7 +3416,7 @@ ${inputVal}
                                   </button>
                                 </div>
 
-                                 {/* 右側：IG 貼文配圖生產器 (1080x1080) */}
+                                 {/* 右側：IG 貼文配圖生產器 (1080x1350) */}
                                  <InstagramPostPreviewer
                                    story={story}
                                    currentIssueNumber={currentIssueNumber}
