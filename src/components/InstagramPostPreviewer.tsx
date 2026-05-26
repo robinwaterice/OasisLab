@@ -37,7 +37,7 @@ interface InstagramPostPreviewerProps {
   editTitle: string;
   editDescription: string;
   editCoverImage: string;
-  onDownload: () => void;
+  onDownload: (ratio: '4:5' | '9:16') => void;
 }
 
 export default function InstagramPostPreviewer({
@@ -50,6 +50,7 @@ export default function InstagramPostPreviewer({
   onDownload
 }: InstagramPostPreviewerProps) {
   
+  const [activeRatio, setActiveRatio] = React.useState<'4:5' | '9:16'>('4:5');
   const title = isEditing ? editTitle : story.title;
   const description = isEditing ? editDescription : story.description;
   const coverImage = isEditing ? editCoverImage : story.coverImage;
@@ -65,18 +66,46 @@ export default function InstagramPostPreviewer({
 
   return (
     <div className="lg:col-span-5 flex flex-col items-center bg-[#5A6351]/5 border border-[#5A6351]/15 rounded-2xl p-6 shadow-sm w-full">
-      <div className="flex items-center space-x-2 mb-4 self-start text-[#5A6351]">
-        <Smartphone className="w-4 h-4" />
-        <span className="font-mono-data text-xs tracking-wider font-bold uppercase text-[#5A6351]">INSTAGRAM POST GENERATOR // 官方社群貼文配圖</span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full mb-4">
+        <div className="flex items-center space-x-2 text-[#5A6351]">
+          <Smartphone className="w-4 h-4" />
+          <span className="font-mono-data text-xs tracking-wider font-bold uppercase text-[#5A6351]">INSTAGRAM POST GENERATOR // 官方社群貼文配圖</span>
+        </div>
+        <div className="flex space-x-1.5 self-end sm:self-auto bg-[#5A6351]/10 p-1 rounded-lg">
+          <button
+            type="button"
+            onClick={() => setActiveRatio('4:5')}
+            className={`px-3 py-1 text-[10px] font-sans-ui font-bold rounded-md transition-all cursor-pointer ${
+              activeRatio === '4:5'
+                ? 'bg-[#5A6351] text-white shadow-sm'
+                : 'text-[#5A6351]/75 hover:text-[#5A6351]'
+            }`}
+          >
+            4:5 貼文
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveRatio('9:16')}
+            className={`px-3 py-1 text-[10px] font-sans-ui font-bold rounded-md transition-all cursor-pointer ${
+              activeRatio === '9:16'
+                ? 'bg-[#5A6351] text-white shadow-sm'
+                : 'text-[#5A6351]/75 hover:text-[#5A6351]'
+            }`}
+          >
+            9:16 限動
+          </button>
+        </div>
       </div>
 
       <p className="font-sans-ui text-[11px] text-[#2C2C2A]/65 leading-relaxed mb-5 self-start">
-        此區域為專題產生時同步渲染的 <strong>官方 IG 貼文專用配圖 (1080x1350, 比例 4:5)</strong>。配圖的文字會隨著左側您的編輯在下方預覽中<strong>即時同步更新</strong>。字體、品牌邊框和排版細節均符合 Oasis Lab. 的生活美學風格，確保官方帳號視覺的一致性。
+        此區域為專題產生時同步渲染的 <strong>官方 IG 貼文專用配圖 (支援 1080x1350 與 1080x1920 雙尺寸)</strong>。配圖的文字會隨著左側您的編輯在下方預覽中<strong>即時同步更新</strong>。字體、品牌邊框和排版細節均符合 Oasis Lab. 的生活美學風格，確保官方帳號視覺的一致性。
       </p>
 
       {/* IG 貼文卡片預覽 */}
       <div className="mb-5 flex justify-center w-full">
-        <div className="w-full max-w-[340px] aspect-[4/5] relative bg-[#2C2C2A] rounded-xl shadow-lg overflow-hidden border border-[#2C2C2A]/15 select-none group">
+        <div className={`w-full max-w-[340px] relative bg-[#2C2C2A] rounded-xl shadow-lg overflow-hidden border border-[#2C2C2A]/15 select-none group transition-all duration-300 ${
+          activeRatio === '9:16' ? 'aspect-[9/16]' : 'aspect-[4/5]'
+        }`}>
           {/* 專題封面底圖 */}
           <img 
             src={displayImage} 
@@ -133,16 +162,25 @@ export default function InstagramPostPreviewer({
           </div>
         </div>
       </div>
-
       {/* 一鍵下載高解析 PNG 圖按鈕 */}
-      <button
-        type="button"
-        onClick={onDownload}
-        className="w-full bg-[#2C2C2A] hover:bg-[#1E1E1D] text-[#F4F4F3] font-sans-ui text-xs font-bold py-3 px-4 rounded-lg cursor-pointer transition-all flex items-center justify-center space-x-2 shadow-md hover:shadow-lg"
-      >
-        <Download className="w-4 h-4 text-[#F4F4F3]" />
-        <span>下載官方 IG 高畫質貼文圖片 (1080x1350, 比例 4:5)</span>
-      </button>
+      <div className="flex flex-col sm:flex-row gap-3 w-full mt-2">
+        <button
+          type="button"
+          onClick={() => onDownload('4:5')}
+          className="flex-1 bg-[#2C2C2A] hover:bg-[#1E1E1D] text-[#F4F4F3] font-sans-ui text-xs font-bold py-3 px-4 rounded-lg cursor-pointer transition-all flex items-center justify-center space-x-1.5 shadow-md hover:shadow-lg"
+        >
+          <Download className="w-3.5 h-3.5 text-[#F4F4F3]" />
+          <span>下載貼文 (4:5)</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onDownload('9:16')}
+          className="flex-1 bg-white hover:bg-neutral-50 text-[#2C2C2A] border border-[#2C2C2A]/20 font-sans-ui text-xs font-bold py-3 px-4 rounded-lg cursor-pointer transition-all flex items-center justify-center space-x-1.5 shadow-sm hover:shadow-md"
+        >
+          <Download className="w-3.5 h-3.5 text-[#2C2C2A]" />
+          <span>下載限動 (9:16)</span>
+        </button>
+      </div>
     </div>
   );
 }

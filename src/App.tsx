@@ -875,12 +875,12 @@ export default function App() {
 
 
 
-  // 高畫質 1080x1350 官方 IG 貼文配圖生成並下載函數
-  const handleDownloadInstagramPost = (story: Story) => {
-    // 建立一個離線的 1080x1350 Canvas 進行高解析度渲染
+  // 高畫質 官方 IG 配圖生成並下載函數 (支援 4:5 與 9:16)
+  const handleDownloadInstagramPost = (story: Story, ratio: '4:5' | '9:16' = '4:5') => {
+    // 建立一個離線的 Canvas 進行高解析度渲染
     const canvas = document.createElement('canvas');
     canvas.width = 1080;
-    canvas.height = 1350;
+    canvas.height = ratio === '9:16' ? 1920 : 1350;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -1096,7 +1096,7 @@ export default function App() {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.src = story.coverImage;
-    triggerToast('⏳ 正在以 Oasis Lab. 品牌語彙轉譯與生成官方 IG 貼文圖片 (1080x1350)...');
+    triggerToast(`⏳ 正在以 Oasis Lab. 品牌語彙轉譯與生成官方 IG 貼文圖片 (${ratio === '9:16' ? '1080x1920' : '1080x1350'})...`);
 
     img.onload = () => {
       performDrawing(img);
@@ -3416,7 +3416,7 @@ ${inputVal}
                                   </button>
                                 </div>
 
-                                 {/* 右側：IG 貼文配圖生產器 (1080x1350) */}
+                                 {/* 右側：IG 貼文與限動配圖生產器 (1080x1350 / 1080x1920) */}
                                  <InstagramPostPreviewer
                                    story={story}
                                    currentIssueNumber={currentIssueNumber}
@@ -3424,7 +3424,7 @@ ${inputVal}
                                    editTitle={editTitle}
                                    editDescription={editDescription}
                                    editCoverImage={editCoverImage}
-                                   onDownload={() => handleDownloadInstagramPost(story)}
+                                   onDownload={(ratio) => handleDownloadInstagramPost(story, ratio)}
                                  />
                               </div>
                             );
