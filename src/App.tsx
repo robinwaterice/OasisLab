@@ -877,235 +877,309 @@ export default function App() {
 
   // 高畫質 官方 IG 配圖生成並下載函數 (支援 4:5 與 9:16)
   const handleDownloadInstagramPost = (story: Story, ratio: '4:5' | '9:16' = '4:5') => {
-    // 建立一個離線的 Canvas 進行高解析度渲染
-    const canvas = document.createElement('canvas');
-    canvas.width = 1080;
-    canvas.height = ratio === '9:16' ? 1920 : 1350;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
     const isEditingCurrent = story.id === selectedEditStoryId;
     const title = isEditingCurrent ? editTitle : story.title;
     const description = isEditingCurrent ? editDescription : story.description;
+    const coverImage = isEditingCurrent ? editCoverImage : story.coverImage;
     const dateTag = story.date || getIssueDate(currentIssueNumber);
     const dateStr = dateTag.split('//')[1]?.trim() || 'SUMMER 2026';
+    const issueStr = `ISSUE ${String(currentIssueNumber).padStart(3, '0')}`;
 
-    const performDrawing = (useImg?: HTMLImageElement) => {
-      // 1. 繪製背景
-      if (useImg) {
-        const canvasRatio = canvas.width / canvas.height;
-        const imgRatio = useImg.width / useImg.height;
-        let drawWidth = canvas.width;
-        let drawHeight = canvas.height;
-        let offsetX = 0;
-        let offsetY = 0;
+    triggerToast(`⏳ 正在以 Oasis Lab. 品牌語彙加載字型並生成官方 IG 貼文圖片 (${ratio === '9:16' ? '1080x1920' : '1080x1350'})...`);
 
-        if (imgRatio > canvasRatio) {
-          drawWidth = canvas.height * imgRatio;
-          offsetX = (canvas.width - drawWidth) / 2;
-        } else {
-          drawHeight = canvas.width / imgRatio;
-          offsetY = (canvas.height - drawHeight) / 2;
-        }
+    // 確保所有品牌網頁字型都已經完全加載，避免 Canvas 退回系統預設字型
+    Promise.all([
+      document.fonts.load('900 18px "Noto Serif TC"'),
+      document.fonts.load('italic 11px "Noto Serif TC"'),
+      document.fonts.load('800 10px "JetBrains Mono"'),
+      document.fonts.load('bold 8px "JetBrains Mono"'),
+      document.fonts.load('bold 9px "JetBrains Mono"')
+    ]).then(() => {
+      // 建立一個離線的 Canvas 進行高解析度渲染
+      const canvas = document.createElement('canvas');
+      canvas.width = 1080;
+      canvas.height = ratio === '9:16' ? 1920 : 1350;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-        ctx.fillStyle = '#1C1C1A';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(useImg, offsetX, offsetY, drawWidth, drawHeight);
+      // 定義預覽畫面的設計空間寬高 (作為基準，完美對齊 CSS 預覽)
+      const designWidth = 340;
+      const designHeight = ratio === '9:16' ? 604.44 : 425;
+      const scaleFactor = 1080 / designWidth; // 約 3.17647 倍
 
-        // 2. 疊加高級雙重漸層電影混色濾鏡，確保中央文字閱讀的極致高雅對比
-        const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        grad.addColorStop(0, 'rgba(44, 44, 42, 0.65)');
-        grad.addColorStop(0.5, 'rgba(44, 44, 42, 0.45)');
-        grad.addColorStop(1, 'rgba(44, 44, 42, 0.75)');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      } else {
-        // 降級純色背景：使用帶有微弱顆粒感或漸層的高雅品牌 Sage Green `#5A6351` 或 Charcoal `#2C2C2A` 混色
-        const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-        grad.addColorStop(0, '#5A6351');
-        grad.addColorStop(1, '#2C2C2A');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
+      // 將 Canvas 全域座標放大，接下來的所有繪圖都可以直接使用預覽框 (340px) 的 CSS 數值！
+      ctx.scale(scaleFactor, scaleFactor);
 
-      // 3. 繪製品牌視覺線條邊框與角落美學對焦直角
-      // 外層細框 (3.5% Padding = 38px)
-      ctx.strokeStyle = 'rgba(244, 244, 243, 0.25)';
-      ctx.lineWidth = 2;
-      const outerPad = 38;
-      ctx.strokeRect(outerPad, outerPad, canvas.width - outerPad * 2, canvas.height - outerPad * 2);
-
-      // 內層品牌實線框 (5.5% Padding = 60px)
-      ctx.strokeStyle = 'rgba(244, 244, 243, 0.65)';
-      ctx.lineWidth = 3;
-      const innerPad = 60;
-      ctx.strokeRect(innerPad, innerPad, canvas.width - innerPad * 2, canvas.height - innerPad * 2);
-
-      // 角落 L 型輔助直角 (角落內縮邊框 22px)
-      ctx.strokeStyle = 'rgba(244, 244, 243, 0.9)';
-      ctx.lineWidth = 4;
-      const cornerSize = 25;
-      const cornerOffset = innerPad + 22;
-
-      // 左上角
-      ctx.beginPath();
-      ctx.moveTo(cornerOffset, cornerOffset + cornerSize);
-      ctx.lineTo(cornerOffset, cornerOffset);
-      ctx.lineTo(cornerOffset + cornerSize, cornerOffset);
-      ctx.stroke();
-
-      // 右上角
-      ctx.beginPath();
-      ctx.moveTo(canvas.width - cornerOffset - cornerSize, cornerOffset);
-      ctx.lineTo(canvas.width - cornerOffset, cornerOffset);
-      ctx.lineTo(canvas.width - cornerOffset, cornerOffset + cornerSize);
-      ctx.stroke();
-
-      // 左下角
-      ctx.beginPath();
-      ctx.moveTo(cornerOffset, canvas.height - cornerOffset - cornerSize);
-      ctx.lineTo(cornerOffset, canvas.height - cornerOffset);
-      ctx.lineTo(cornerOffset + cornerSize, canvas.height - cornerOffset);
-      ctx.stroke();
-
-      // 右下角
-      ctx.beginPath();
-      ctx.moveTo(canvas.width - cornerOffset - cornerSize, canvas.height - cornerOffset);
-      ctx.lineTo(canvas.width - cornerOffset, canvas.height - cornerOffset);
-      ctx.lineTo(canvas.width - cornerOffset, canvas.height - cornerOffset - cornerSize);
-      ctx.stroke();
-
-      // 4. 繪製頁首 OASIS LAB. 品牌資訊 (Centered)
-      ctx.fillStyle = '#F4F4F3';
-      ctx.textAlign = 'center';
-      
-      ctx.font = '800 28px Courier New, monospace';
-      ctx.fillText('OASIS LAB.', canvas.width / 2, innerPad + 60);
-
-      ctx.fillStyle = 'rgba(244, 244, 243, 0.6)';
-      ctx.font = 'bold 18px Courier New, monospace';
-      ctx.fillText('// EDITORIAL JOURNAL //', canvas.width / 2, innerPad + 95);
-
-      // 5. 核心排版：專題標題與摘要文字 (Centered)
-      // 裝飾用雙側水平引線
-      ctx.strokeStyle = 'rgba(244, 244, 243, 0.35)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(canvas.width / 2 - 40, canvas.height / 2 - 130);
-      ctx.lineTo(canvas.width / 2 + 40, canvas.height / 2 - 130);
-      ctx.stroke();
-
-      // 繪製中文標題 (高雅明體字)
-      ctx.fillStyle = '#F4F4F3';
-      ctx.font = '900 46px Georgia, PMingLiU, serif';
-      const maxTextWidth = canvas.width - innerPad * 2 - 180;
-      
-      const titleLines = [];
-      const titleChars = title.split('');
-      let line = '';
-      for (let n = 0; n < titleChars.length; n++) {
-        const testLine = line + titleChars[n];
-        const metrics = ctx.measureText(testLine);
-        if (metrics.width > maxTextWidth && n > 0) {
-          titleLines.push(line);
-          line = titleChars[n];
-        } else {
-          line = testLine;
-        }
-      }
-      titleLines.push(line);
-
-      let titleY = canvas.height / 2 - 50;
-      const titleLineHeight = 65;
-      titleLines.forEach(l => {
-        ctx.fillText(l, canvas.width / 2, titleY);
-        titleY += titleLineHeight;
-      });
-
-      // 中間點綴水平引線
-      ctx.strokeStyle = 'rgba(244, 244, 243, 0.25)';
-      ctx.beginPath();
-      ctx.moveTo(canvas.width / 2 - 30, titleY - 10);
-      ctx.lineTo(canvas.width / 2 + 30, titleY - 10);
-      ctx.stroke();
-
-      // 繪製溫潤摘要文字 (明體斜體字)
-      ctx.fillStyle = 'rgba(244, 244, 243, 0.85)';
-      ctx.font = 'italic 28px Georgia, PMingLiU, serif';
-      
-      const descLines = [];
-      const descText = `“${description}”`;
-      const descChars = descText.split('');
-      let descLine = '';
-      for (let n = 0; n < descChars.length; n++) {
-        const testLine = descLine + descChars[n];
-        const metrics = ctx.measureText(testLine);
-        if (metrics.width > maxTextWidth && n > 0) {
-          descLines.push(descLine);
-          descLine = descChars[n];
-        } else {
-          descLine = testLine;
-        }
-      }
-      descLines.push(descLine);
-
-      let descY = titleY + 30;
-      const descLineHeight = 44;
-      descLines.forEach(l => {
-        ctx.fillText(l, canvas.width / 2, descY);
-        descY += descLineHeight;
-      });
-
-      // 下引線
-      ctx.strokeStyle = 'rgba(244, 244, 243, 0.35)';
-      ctx.beginPath();
-      ctx.moveTo(canvas.width / 2 - 40, descY);
-      ctx.lineTo(canvas.width / 2 + 40, descY);
-      ctx.stroke();
-
-      // 6. 繪製頁尾期刊期數與日期標籤
-      ctx.fillStyle = 'rgba(244, 244, 243, 0.9)';
-      ctx.font = 'bold 22px Courier New, monospace';
-      ctx.fillText(`ISSUE ${String(currentIssueNumber).padStart(3, '0')} // ${story.targetTag.toUpperCase()}`, canvas.width / 2, canvas.height - innerPad - 80);
-
-      ctx.fillStyle = 'rgba(244, 244, 243, 0.45)';
-      ctx.font = 'bold 16px Courier New, monospace';
-      ctx.fillText(dateStr, canvas.width / 2, canvas.height - innerPad - 45);
-
-      // 7. 將 Canvas 匯出為高畫質 PNG 並觸發瀏覽器下載流程
-      try {
-        const url = canvas.toDataURL('image/png');
-        const link = document.createElement('a');
-        link.download = `OasisLab_IG_${story.id}.png`;
-        link.href = url;
-        link.click();
-        triggerToast(`📸 專題社群貼文圖片《OasisLab_IG_${story.id}.png》已成功匯出至您的本機！`);
-      } catch (err) {
-        console.error(err);
-        // 如果是 CORS 安全性報錯，降級用純色重繪並重新導出 (100% 成功保證)
+      const performDrawing = (useImg?: HTMLImageElement) => {
+        // 1. 繪製背景
         if (useImg) {
-          triggerToast('⚠️ 偵測到底圖安全性存取限制 (CORS)，已自動為您調校為極簡品牌底色並完成匯出！');
-          performDrawing();
+          const designRatio = designWidth / designHeight;
+          const imgRatio = useImg.width / useImg.height;
+          let drawWidth = designWidth;
+          let drawHeight = designHeight;
+          let offsetX = 0;
+          let offsetY = 0;
+
+          if (imgRatio > designRatio) {
+            drawWidth = designHeight * imgRatio;
+            offsetX = (designWidth - drawWidth) / 2;
+          } else {
+            drawHeight = designWidth / imgRatio;
+            offsetY = (designHeight - drawHeight) / 2;
+          }
+
+          // 1.1 品牌炭黑底色 (#2C2C2A)
+          ctx.fillStyle = '#2C2C2A';
+          ctx.fillRect(0, 0, designWidth, designHeight);
+
+          // 1.2 繪製圖片 (opacity 80%)
+          ctx.globalAlpha = 0.8;
+          ctx.drawImage(useImg, offsetX, offsetY, drawWidth, drawHeight);
+          ctx.globalAlpha = 1.0; // 還原透明度
+
+          // 2. 電影感疊加層 (mix-blend-multiply)
+          ctx.globalCompositeOperation = 'multiply';
+          const grad = ctx.createLinearGradient(0, 0, 0, designHeight);
+          grad.addColorStop(0, 'rgba(44, 44, 42, 0.65)');
+          grad.addColorStop(0.5, 'rgba(44, 44, 42, 0.45)');
+          grad.addColorStop(1, 'rgba(44, 44, 42, 0.75)');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, designWidth, designHeight);
+          ctx.globalCompositeOperation = 'source-over'; // 還原
         } else {
-          triggerToast('❌ 底圖安全存取限制 (CORS)，請確認底圖聯網授權。');
+          // 降級純色背景
+          const grad = ctx.createLinearGradient(0, 0, designWidth, designHeight);
+          grad.addColorStop(0, '#5A6351');
+          grad.addColorStop(1, '#2C2C2A');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, designWidth, designHeight);
         }
-      }
-    };
 
-    // 載入背景封面圖片，確保支援 CORS 跨網域渲染
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.src = story.coverImage;
-    triggerToast(`⏳ 正在以 Oasis Lab. 品牌語彙轉譯與生成官方 IG 貼文圖片 (${ratio === '9:16' ? '1080x1920' : '1080x1350'})...`);
+        // 3. 繪製品牌視覺線條邊框與角落美學直角 (完美重現 340px 空間中的 CSS padding)
+        // 外層細框 (padding = 14px, 相當於 inset-3.5)
+        ctx.strokeStyle = 'rgba(244, 244, 243, 0.2)';
+        ctx.lineWidth = 1;
+        const outerPad = 14;
+        ctx.strokeRect(outerPad, outerPad, designWidth - outerPad * 2, designHeight - outerPad * 2);
 
-    img.onload = () => {
-      performDrawing(img);
-    };
+        // 內層實線框 (padding = 22px, 相當於 inset-5.5)
+        ctx.strokeStyle = 'rgba(244, 244, 243, 0.6)';
+        ctx.lineWidth = 1;
+        const innerPad = 22;
+        ctx.strokeRect(innerPad, innerPad, designWidth - innerPad * 2, designHeight - innerPad * 2);
 
-    img.onerror = () => {
-      triggerToast('❌ 底圖載入失敗，可能因圖片網址不支援或跨網域(CORS)限制。');
-    };
+        // 角落 L 型美學對焦直角 (頂部/邊緣向內各 32px，長度 10px)
+        ctx.strokeStyle = 'rgba(244, 244, 243, 0.9)';
+        ctx.lineWidth = 1;
+        const cornerSize = 10;
+        const cornerOffset = innerPad + 10; // 32px
+
+        // 左上角
+        ctx.beginPath();
+        ctx.moveTo(cornerOffset, cornerOffset + cornerSize);
+        ctx.lineTo(cornerOffset, cornerOffset);
+        ctx.lineTo(cornerOffset + cornerSize, cornerOffset);
+        ctx.stroke();
+
+        // 右上角
+        ctx.beginPath();
+        ctx.moveTo(designWidth - cornerOffset - cornerSize, cornerOffset);
+        ctx.lineTo(designWidth - cornerOffset, cornerOffset);
+        ctx.lineTo(designWidth - cornerOffset, cornerOffset + cornerSize);
+        ctx.stroke();
+
+        // 左下角
+        ctx.beginPath();
+        ctx.moveTo(cornerOffset, designHeight - cornerOffset - cornerSize);
+        ctx.lineTo(cornerOffset, designHeight - cornerOffset);
+        ctx.lineTo(cornerOffset + cornerSize, designHeight - cornerOffset);
+        ctx.stroke();
+
+        // 右下角
+        ctx.beginPath();
+        ctx.moveTo(designWidth - cornerOffset - cornerSize, designHeight - cornerOffset);
+        ctx.lineTo(designWidth - cornerOffset, designHeight - cornerOffset);
+        ctx.lineTo(designWidth - cornerOffset, designHeight - cornerOffset - cornerSize);
+        ctx.stroke();
+
+        // 4. 繪製頁首 OASIS LAB. 品牌資訊 (Centered)
+        ctx.fillStyle = '#F4F4F3';
+        ctx.textAlign = 'center';
+        
+        ctx.font = '800 10px "JetBrains Mono", Courier New, monospace';
+        ctx.letterSpacing = '2.5px'; // 0.25em tracking
+        ctx.fillText('Oasis Lab.'.toUpperCase(), designWidth / 2, innerPad + 18);
+
+        ctx.fillStyle = 'rgba(244, 244, 243, 0.5)';
+        ctx.font = 'bold 8px "JetBrains Mono", Courier New, monospace';
+        ctx.letterSpacing = '1.2px'; // 0.15em tracking
+        ctx.fillText('// EDITORIAL JOURNAL //', designWidth / 2, innerPad + 30);
+        ctx.letterSpacing = 'normal'; // 重置
+
+        // 5. 核心排版：文字寬度與斷行 (與 CSS 預覽中 max-w-[90%] 的 266px 完美吻合)
+        const maxTextWidth = (designWidth - innerPad * 2) * 0.9; // 約 266.4px
+
+        // 5.1 解析與分行標題 (思源宋體，900字重，18px)
+        ctx.font = '900 18px "Noto Serif TC", "Noto Serif", Georgia, PMingLiU, serif';
+        const titleLines = [];
+        const titleChars = (title || '未命名專題').split('');
+        let currentTitleLine = '';
+        for (let n = 0; n < titleChars.length; n++) {
+          const testLine = currentTitleLine + titleChars[n];
+          const metrics = ctx.measureText(testLine);
+          if (metrics.width > maxTextWidth && n > 0) {
+            titleLines.push(currentTitleLine);
+            currentTitleLine = titleChars[n];
+          } else {
+            currentTitleLine = testLine;
+          }
+        }
+        titleLines.push(currentTitleLine);
+
+        // 套用 line-clamp-2 限制，與預覽一致
+        const finalTitleLines = titleLines.slice(0, 2);
+        if (titleLines.length > 2) {
+          let lastLine = finalTitleLines[1];
+          while (ctx.measureText(lastLine + '...').width > maxTextWidth && lastLine.length > 0) {
+            lastLine = lastLine.slice(0, -1);
+          }
+          finalTitleLines[1] = lastLine + '...';
+        }
+
+        // 5.2 解析與分行引言 (思源宋體，斜體，11px)
+        ctx.font = 'italic 11px "Noto Serif TC", "Noto Serif", Georgia, PMingLiU, serif';
+        const descLines = [];
+        const descText = `“${description || '無引言內容'}”`;
+        const descChars = descText.split('');
+        let currentDescLine = '';
+        for (let n = 0; n < descChars.length; n++) {
+          const testLine = currentDescLine + descChars[n];
+          const metrics = ctx.measureText(testLine);
+          if (metrics.width > maxTextWidth && n > 0) {
+            descLines.push(currentDescLine);
+            currentDescLine = descChars[n];
+          } else {
+            currentDescLine = testLine;
+          }
+        }
+        descLines.push(currentDescLine);
+
+        // 套用 line-clamp-2 限制
+        const finalDescLines = descLines.slice(0, 2);
+        if (descLines.length > 2) {
+          let lastLine = finalDescLines[1];
+          while (ctx.measureText(lastLine + '...”').width > maxTextWidth && lastLine.length > 0) {
+            lastLine = lastLine.slice(0, -1);
+          }
+          finalDescLines[1] = lastLine + '...”';
+        }
+
+        // 5.3 計算文字區塊總高度與動態垂直居中座標
+        // 標題行高為 25px (相當於 leading-snug)，引言行高為 18px (相當於 leading-relaxed)
+        const titleLineHeight = 25;
+        const descLineHeight = 18;
+        const titleBlockHeight = (finalTitleLines.length - 1) * titleLineHeight + 18;
+        const descBlockHeight = (finalDescLines.length - 1) * descLineHeight + 11;
+
+        // 總高度組成為：上引線(1.5px) + 間距(14px) + 標題內容高 + 間距(14px) + 中引線(1px) + 間距(14px) + 引言內容高 + 間距(14px) + 下引線(1.5px)
+        const totalMiddleBlockHeight = 1.5 + 14 + titleBlockHeight + 14 + 1 + 14 + descBlockHeight + 14 + 1.5;
+
+        // 計算完美的置中 startY 點
+        const startY = (designHeight - totalMiddleBlockHeight) / 2;
+
+        // 5.4 繪製 上引線 (w-12 = 48px)
+        ctx.strokeStyle = 'rgba(244, 244, 243, 0.3)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(designWidth / 2 - 24, startY + 0.75);
+        ctx.lineTo(designWidth / 2 + 24, startY + 0.75);
+        ctx.stroke();
+
+        // 5.5 繪製 中文標題 (思源宋體，900字重，18px)
+        ctx.fillStyle = '#F4F4F3';
+        ctx.font = '900 18px "Noto Serif TC", "Noto Serif", Georgia, PMingLiU, serif';
+        ctx.letterSpacing = '0.45px'; // 0.025em tracking
+        const titleFirstLineBaseline = startY + 1.5 + 14 + 14.5; // 起始位移 + 上引線寬 + 間距 + 字高基底約 14.5px
+        finalTitleLines.forEach((l, index) => {
+          ctx.fillText(l, designWidth / 2, titleFirstLineBaseline + index * titleLineHeight);
+        });
+        ctx.letterSpacing = 'normal'; // 重置
+        
+        // 5.6 繪製 中引線 (w-8 = 32px)
+        const titleBlockEnd = titleFirstLineBaseline + (finalTitleLines.length - 1) * titleLineHeight + 3.5;
+        const middleLineY = titleBlockEnd + 14;
+        ctx.strokeStyle = 'rgba(244, 244, 243, 0.25)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(designWidth / 2 - 16, middleLineY + 0.5);
+        ctx.lineTo(designWidth / 2 + 16, middleLineY + 0.5);
+        ctx.stroke();
+
+        // 5.7 繪製 溫潤摘要引言 (思源宋體斜體，11px)
+        ctx.fillStyle = 'rgba(244, 244, 243, 0.8)';
+        ctx.font = 'italic 11px "Noto Serif TC", "Noto Serif", Georgia, PMingLiU, serif';
+        const descFirstLineBaseline = middleLineY + 1 + 14 + 9; // 中引線基底 + 寬 + 間距 + 字高基底約 9px
+        finalDescLines.forEach((l, index) => {
+          ctx.fillText(l, designWidth / 2, descFirstLineBaseline + index * descLineHeight);
+        });
+
+        // 5.8 繪製 下引線 (w-12 = 48px)
+        const descBlockEnd = descFirstLineBaseline + (finalDescLines.length - 1) * descLineHeight + 2;
+        const lowerLineY = descBlockEnd + 14;
+        ctx.strokeStyle = 'rgba(244, 244, 243, 0.3)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(designWidth / 2 - 24, lowerLineY + 0.75);
+        ctx.lineTo(designWidth / 2 + 24, lowerLineY + 0.75);
+        ctx.stroke();
+
+        // 6. 繪製頁尾期刊期數與日期標籤 (對齊 CSS 預覽 pb-1)
+        ctx.fillStyle = 'rgba(244, 244, 243, 0.9)';
+        ctx.font = 'bold 9px "JetBrains Mono", Courier New, monospace';
+        ctx.letterSpacing = '1.35px'; // 0.15em tracking
+        ctx.fillText(`${issueStr} // ${story.targetTag.toUpperCase()}`, designWidth / 2, designHeight - innerPad - 20);
+   
+        ctx.fillStyle = 'rgba(244, 244, 243, 0.4)';
+        ctx.font = 'bold 8px "JetBrains Mono", Courier New, monospace';
+        ctx.letterSpacing = '0.8px'; // 0.1em tracking
+        ctx.fillText(dateStr.toUpperCase(), designWidth / 2, designHeight - innerPad - 8);
+        ctx.letterSpacing = 'normal'; // 重置
+
+        // 7. 將 Canvas 匯出為高畫質 PNG 並觸發瀏覽器下載流程
+        try {
+          const url = canvas.toDataURL('image/png');
+          const link = document.createElement('a');
+          link.download = `OasisLab_IG_${story.id}.png`;
+          link.href = url;
+          link.click();
+          triggerToast(`📸 專題社群貼文圖片《OasisLab_IG_${story.id}.png》已成功匯出至您的本機！`);
+        } catch (err) {
+          console.error(err);
+          // 如果是 CORS 安全性報錯，降級用純色重繪並重新導出 (100% 成功保證)
+          if (useImg) {
+            triggerToast('⚠️ 偵測到底圖安全性存取限制 (CORS)，已自動為您調校為極簡品牌底色並完成匯出！');
+            performDrawing();
+          } else {
+            triggerToast('❌ 底圖安全存取限制 (CORS)，請確認底圖聯網授權。');
+          }
+        }
+      };
+
+      // 載入背景封面圖片，確保支援 CORS 跨網域渲染
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = coverImage;
+
+      img.onload = () => {
+        performDrawing(img);
+      };
+
+      img.onerror = () => {
+        triggerToast('❌ 底圖載入失敗，可能因圖片網址不支援或跨網域(CORS)限制。');
+      };
+    });
   };
+
 
   // PWA (Progressive Web App) 狀態
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -4309,6 +4383,15 @@ ${inputVal}
           </div>
         </div>
       </footer>
+
+      {/* 強制瀏覽器先行加載並渲染 Noto Serif TC 與 JetBrains Mono 的特粗與斜體字重，保障 Canvas 繪圖 100% 成功套用 */}
+      <div className="sr-only select-none pointer-events-none absolute -z-[9999]" aria-hidden="true" style={{ opacity: 0, width: 0, height: 0, overflow: 'hidden' }}>
+        <span style={{ fontFamily: '"Noto Serif TC"', fontWeight: 900 }}>Oasis 數位游牧民的桌面進化論 900</span>
+        <span style={{ fontFamily: '"Noto Serif TC"', fontWeight: 700 }}>Oasis 數位游牧民的桌面進化論 700</span>
+        <span style={{ fontFamily: '"Noto Serif TC"', fontWeight: 400, fontStyle: 'italic' }}>Oasis “重塑物理空間的束縛” italic</span>
+        <span style={{ fontFamily: '"JetBrains Mono"', fontWeight: 800 }}>OASIS LAB 800</span>
+        <span style={{ fontFamily: '"JetBrains Mono"', fontWeight: 700 }}>OASIS LAB 700</span>
+      </div>
     </div>
   );
 }
