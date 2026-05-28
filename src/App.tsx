@@ -1606,6 +1606,9 @@ export default function App() {
       setCurrentIssueNumber(25);
       setRollbackIssueNum(25);
       triggerToast('🔄 系統已回復至初始 ISSUE 025 期設定，Archive 已重置。');
+      
+      // ⚡ 自動同步至 GitHub
+      silentSyncToGithub(STORIES, HISTORICAL_STORIES, editableProducts);
     } else {
       const allPossibleStories = [...activeStories, ...archivedStories, ...NEXT_ISSUE_STORIES];
       const targetStories = allPossibleStories.filter(s => getStoryIssueNumber(s) === targetIssue);
@@ -1619,6 +1622,9 @@ export default function App() {
         setCurrentIssueNumber(targetIssue);
         setRollbackIssueNum(targetIssue);
         triggerToast(`🔄 系統已成功重置回第 ${String(targetIssue).padStart(3, '0')} 期專題狀態！`);
+        
+        // ⚡ 自動同步至 GitHub
+        silentSyncToGithub(targetStories, earlierStories, editableProducts);
       } else {
         triggerToast(`⚠️ 找不到第 ${String(targetIssue).padStart(3, '0')} 期的專題存檔。`);
       }
