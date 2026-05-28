@@ -540,3 +540,6 @@ export const PRODUCTS: Product[] = [
     "designer_critique": "這款水瓶將東方的黑瓦線條與西方極簡科技融合得非常巧妙。最讓人驚喜的是瓶身的塗層觸感，它徹底擺脫了傳統金屬保溫杯的冰冷與滑膩，讓人忍不住一次次握持。溫控螢幕的顯示極其低調內斂，不帶任何科技侵入感。"
   }
 ];
+
+export const DATA_VERSION: number = 0;
+

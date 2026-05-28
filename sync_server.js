@@ -48,6 +48,8 @@ export const HISTORICAL_STORIES: Story[] = ${JSON.stringify(parsedArchived, null
 export const NEXT_ISSUE_STORIES: Story[] = ${JSON.stringify(nextIssueStories, null, 2)};
 
 export const PRODUCTS: Product[] = ${JSON.stringify(parsedProducts, null, 2)};
+
+export const DATA_VERSION: number = ${Date.now()};
 `;
 
     fs.writeFileSync(dataTsPath, updatedDataTs, 'utf8');

@@ -1556,6 +1556,48 @@ export default function App() {
     return 25;
   };
 
+  // ⚡ 雙向同步：當雲端 `data.ts` 的版本新於本機快取時，自動覆蓋本機快取，確保所有設備同步更新
+  useEffect(() => {
+    try {
+      const cachedVersionStr = localStorage.getItem('oasis_data_version');
+      const cachedVersion = cachedVersionStr ? parseInt(cachedVersionStr, 10) : 0;
+      
+      if (DATA_VERSION && DATA_VERSION > cachedVersion) {
+        console.log(`[Sync] Cloud version (${DATA_VERSION}) is newer than cached version (${cachedVersion}). Syncing...`);
+        
+        // 覆蓋 State
+        setActiveStories(STORIES);
+        setArchivedStories(HISTORICAL_STORIES);
+        setEditableProducts(PRODUCTS);
+        
+        // 獲取並計算雲端資料的最新期數
+        const allPossibleStories = [...STORIES, ...HISTORICAL_STORIES, ...NEXT_ISSUE_STORIES];
+        let maxIssue = 25;
+        allPossibleStories.forEach(s => {
+          const issueNum = getStoryIssueNumber(s);
+          if (issueNum > maxIssue) {
+            maxIssue = issueNum;
+          }
+        });
+        setCurrentIssueNumber(maxIssue);
+        
+        // 同步覆蓋 localStorage
+        localStorage.setItem('oasis_active_stories_v2', JSON.stringify(STORIES));
+        localStorage.setItem('oasis_archived_stories_v2', JSON.stringify(HISTORICAL_STORIES));
+        localStorage.setItem('oasis_editable_products_v1', JSON.stringify(PRODUCTS));
+        localStorage.setItem('oasis_issue_number_v2', maxIssue.toString());
+        localStorage.setItem('oasis_data_version', DATA_VERSION.toString());
+        
+        // 使用 setTimeout 確保 toast 正常觸發與顯示
+        setTimeout(() => {
+          triggerToast('🔄 偵測到雲端有最新更新，已為您自動同步最新專題與商品資料！');
+        }, 1000);
+      }
+    } catch (e) {
+      console.warn('[Sync] Auto sync check failed:', e);
+    }
+  }, []);
+
   // 執行重置回指定期數的動作
   const handleRollbackToIssue = (targetIssue: number) => {
     if (targetIssue === 25) {
@@ -1683,6 +1725,11 @@ ${editContent}`;
       const targetArchived = customArchived || archivedStories;
       const targetProducts = customProducts || editableProducts;
 
+      const nowVersion = Date.now();
+      try {
+        localStorage.setItem('oasis_data_version', nowVersion.toString());
+      } catch (e) {}
+
       const updatedDataTs = `/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -1697,6 +1744,8 @@ export const HISTORICAL_STORIES: Story[] = ${JSON.stringify(targetArchived, null
 export const NEXT_ISSUE_STORIES: Story[] = ${JSON.stringify(NEXT_ISSUE_STORIES, null, 2)};
 
 export const PRODUCTS: Product[] = ${JSON.stringify(targetProducts, null, 2)};
+
+export const DATA_VERSION: number = ${nowVersion};
 `;
 
       const apiEndpoint = `https://api.github.com/repos/${username}/${repo}/contents/src/data.ts`;
