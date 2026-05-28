@@ -1708,7 +1708,7 @@ ${editContent}`;
   const handleSyncToGithub = async () => {
     setIsSyncingToGithub(true);
     try {
-      await silentSyncToGithub(activeStories, archivedStories, editableProducts);
+      await silentSyncToGithub(activeStories, archivedStories, editableProducts, true);
     } catch (e) {
       console.warn('手動同步失敗:', e);
       triggerToast('❌ 雲端同步失敗，請檢查網路與 GitHub 金鑰配置！');
@@ -1721,8 +1721,21 @@ ${editContent}`;
   const silentSyncToGithub = async (
     customActive?: Story[],
     customArchived?: Story[],
-    customProducts?: Product[]
+    customProducts?: Product[],
+    forceSync: boolean = false
   ) => {
+    // ⚡ 本機開發測試防干擾機制：若在 localhost 或本機 IP 測試，且非手動強制同步，則不執行自動背景上傳
+    const isLocalhost = window.location.hostname === 'localhost' || 
+                        window.location.hostname === '127.0.0.1' ||
+                        window.location.hostname.startsWith('192.168.') ||
+                        window.location.hostname.startsWith('10.') ||
+                        window.location.hostname.startsWith('172.');
+                        
+    if (isLocalhost && !forceSync) {
+      console.log('[Sync] Local development detected. Silent background sync skipped.');
+      return;
+    }
+
     const username = githubUsername.trim() || import.meta.env.VITE_GITHUB_USERNAME || '';
     const repo = githubRepo.trim() || import.meta.env.VITE_GITHUB_REPO || 'OasisLab';
     const token = githubToken.trim() || import.meta.env.VITE_GITHUB_TOKEN || '';
