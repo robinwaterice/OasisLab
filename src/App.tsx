@@ -1704,6 +1704,19 @@ ${editContent}`;
     }
   };
 
+  // ⚡ 手動一鍵雲端雙向同步
+  const handleSyncToGithub = async () => {
+    setIsSyncingToGithub(true);
+    try {
+      await silentSyncToGithub(activeStories, archivedStories, editableProducts);
+    } catch (e) {
+      console.warn('手動同步失敗:', e);
+      triggerToast('❌ 雲端同步失敗，請檢查網路與 GitHub 金鑰配置！');
+    } finally {
+      setIsSyncingToGithub(false);
+    }
+  };
+
   // ⚡ 在背景默默執行 GitHub 同步，不打斷使用者操作
   const silentSyncToGithub = async (
     customActive?: Story[],
@@ -3845,7 +3858,90 @@ ${inputVal}
                         transition={{ duration: 0.3 }}
                         className="space-y-6"
                       >
+                        {/* ⚡ GitHub 雲端一鍵雙向同步卡片 */}
+                        <div className="bg-gradient-to-br from-[#5A6351]/10 to-transparent border border-[#5A6351]/20 rounded-2xl p-8 shadow-[0_4px_24px_rgba(90,99,81,0.06)] space-y-5">
+                          <div className="flex items-center space-x-3 pb-4 border-b border-[#5A6351]/15">
+                            <div className="p-2 bg-[#5A6351] rounded-lg">
+                              <Sparkles className="w-4 h-4 text-white" />
+                            </div>
+                            <div>
+                              <span className="font-mono-data text-[10px] text-[#5A6351] font-bold tracking-widest uppercase block">GITHUB CLOUD SYNC // 雲端一鍵雙向同步中心</span>
+                              <p className="font-sans-ui text-xs text-[#2C2C2A]/60 mt-0.5">直接將線上後台的修改 Commit & Push 至您的 GitHub 倉庫，自動觸發 Cloudflare Pages 重新編譯部署</p>
+                            </div>
+                          </div>
 
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-sans-ui">
+                            <div>
+                              <label className="block text-[#2C2C2A]/60 font-bold mb-1.5">1. GitHub 帳號 (Username)</label>
+                              <input 
+                                type="text"
+                                value={githubUsername}
+                                onChange={(e) => {
+                                  setGithubUsername(e.target.value);
+                                  localStorage.setItem('oasis_github_username', e.target.value);
+                                }}
+                                placeholder="例如: robinwaterice"
+                                className="w-full bg-white/80 border border-[#2C2C2A]/15 text-[#2C2C2A] px-3.5 py-2.5 rounded-lg focus:outline-none focus:border-[#5A6351] transition-all"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[#2C2C2A]/60 font-bold mb-1.5">2. 倉庫名稱 (Repository)</label>
+                              <input 
+                                type="text"
+                                value={githubRepo}
+                                onChange={(e) => {
+                                  setGithubRepo(e.target.value);
+                                  localStorage.setItem('oasis_github_repo', e.target.value);
+                                }}
+                                placeholder="預設: OasisLab"
+                                className="w-full bg-white/80 border border-[#2C2C2A]/15 text-[#2C2C2A] px-3.5 py-2.5 rounded-lg focus:outline-none focus:border-[#5A6351] transition-all"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[#2C2C2A]/60 font-bold mb-1.5">3. 個人訪問令牌 (GitHub PAT Token)</label>
+                              <input 
+                                type="password"
+                                value={githubToken}
+                                onChange={(e) => {
+                                  setGithubToken(e.target.value);
+                                  localStorage.setItem('oasis_github_token', e.target.value);
+                                }}
+                                placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                                className="w-full bg-white/80 border border-[#2C2C2A]/15 text-[#2C2C2A] px-3.5 py-2.5 rounded-lg focus:outline-none focus:border-[#5A6351] transition-all"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="pt-2">
+                            <button
+                              type="button"
+                              onClick={handleSyncToGithub}
+                              disabled={isSyncingToGithub}
+                              className={`w-full py-3.5 text-white text-xs font-sans-ui font-bold rounded-xl shadow-md transition-all flex items-center justify-center space-x-2 ${
+                                isSyncingToGithub
+                                  ? 'bg-[#5A6351]/50 cursor-not-allowed'
+                                  : 'bg-[#5A6351] hover:bg-[#4E5646] cursor-pointer hover:shadow-lg'
+                              }`}
+                            >
+                              {isSyncingToGithub ? (
+                                <>
+                                  <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}>
+                                    <Sparkles className="w-4 h-4 text-white" />
+                                  </motion.div>
+                                  <span>正在編譯同步並提交變更至 GitHub...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="w-4 h-4 text-white" />
+                                  <span>⚡ 立即執行一鍵雲端雙向同步 (Commit & Push)</span>
+                                </>
+                              )}
+                            </button>
+                            <span className="block text-[10px] text-[#2C2C2A]/40 mt-2 text-center leading-relaxed">
+                              🔒 隱私安全承諾：您的 GitHub Token 僅保存在您當前瀏覽器的 LocalStorage 中，完全由前端發起 API 呼叫，絕無任何中轉伺服器，安全無慮。
+                            </span>
+                          </div>
+                        </div>
 
                         <div className="bg-white border border-[#2C2C2A]/10 rounded-2xl p-8 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
                           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-[#2C2C2A]/5 mb-6">
