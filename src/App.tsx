@@ -187,7 +187,13 @@ export default function App() {
     } catch (e) {}
     return 25;
   });
-  const [savedProducts, setSavedProducts] = useState<string[]>([]);
+  const [savedProducts, setSavedProducts] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('oasis_saved_products_v2');
+      if (saved) return JSON.parse(saved) as string[];
+    } catch (e) {}
+    return [];
+  });
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [shopFilter, setShopFilter] = useState<string>('all');
@@ -473,6 +479,13 @@ export default function App() {
     } catch (e) {}
   }, [currentIssueNumber]);
 
+  // 💾 持久化儲存：珍藏商品列表
+  useEffect(() => {
+    try {
+      localStorage.setItem('oasis_saved_products_v2', JSON.stringify(savedProducts));
+    } catch (e) {}
+  }, [savedProducts]);
+
   // 開啟專題細閱之輔助函數（自動登載實際點擊點數）
   const handleViewStory = (storyId: string) => {
     setStoryClicks(prev => ({
@@ -486,6 +499,24 @@ export default function App() {
   // 處理商品導購重定向，並增加查看數
   const handleProductRedirect = (product: Product) => {
     setActiveReferral(product);
+  };
+
+  // 切換珍藏商品狀態
+  const toggleSaveProduct = (productId: string) => {
+    setSavedProducts(prev => {
+      const isSaved = prev.includes(productId);
+      let next;
+      if (isSaved) {
+        next = prev.filter(id => id !== productId);
+      } else {
+        next = [...prev, productId];
+      }
+      // Use setTimeout to trigger toast after the state transition
+      setTimeout(() => {
+        triggerToast(isSaved ? '💔 已取消珍藏該單品' : '❤️ 已將該單品加入您的珍藏清單！');
+      }, 50);
+      return next;
+    });
   };
 
   // 開啟商品沈浸式詳情介紹，並增加查看數
