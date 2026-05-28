@@ -32,12 +32,31 @@ self.addEventListener('fetch', (event) => {
   // Only handle standard http/https schemes
   if (!event.request.url.startsWith('http')) return;
 
-  // Bypass cache entirely in local development
-  if (
-    self.location.hostname === 'localhost' || 
-    self.location.hostname === '127.0.0.1' || 
-    self.location.port === '3000'
-  ) {
+  // Bypass cache entirely in local development (including mobile testing over local IP and port 3005)
+  const isLocalhost = self.location.hostname === 'localhost' || 
+                      self.location.hostname === '127.0.0.1' || 
+                      self.location.hostname.startsWith('192.168.') ||
+                      self.location.hostname.startsWith('10.') ||
+                      self.location.hostname.startsWith('172.16.') || // or 172.* range
+                      self.location.hostname.startsWith('172.17.') ||
+                      self.location.hostname.startsWith('172.18.') ||
+                      self.location.hostname.startsWith('172.19.') ||
+                      self.location.hostname.startsWith('172.20.') ||
+                      self.location.hostname.startsWith('172.21.') ||
+                      self.location.hostname.startsWith('172.22.') ||
+                      self.location.hostname.startsWith('172.23.') ||
+                      self.location.hostname.startsWith('172.24.') ||
+                      self.location.hostname.startsWith('172.25.') ||
+                      self.location.hostname.startsWith('172.26.') ||
+                      self.location.hostname.startsWith('172.27.') ||
+                      self.location.hostname.startsWith('172.28.') ||
+                      self.location.hostname.startsWith('172.29.') ||
+                      self.location.hostname.startsWith('172.30.') ||
+                      self.location.hostname.startsWith('172.31.') ||
+                      self.location.port === '3005' ||
+                      self.location.port === '3000';
+
+  if (isLocalhost) {
     event.respondWith(fetch(event.request));
     return;
   }
