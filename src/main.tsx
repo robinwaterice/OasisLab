@@ -9,6 +9,23 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
         console.log('Oasis Lab sw registered successfully:', registration.scope);
+
+        // Proactively check for updates on registration
+        registration.update();
+
+        // Listen for new service workers
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                console.log('New version detected! Auto-reloading to apply update.');
+                // Auto reload the page to activate the new Service Worker instantly
+                window.location.reload();
+              }
+            });
+          }
+        });
       })
       .catch((err) => {
         console.log('Oasis Lab sw registration failed:', err);
