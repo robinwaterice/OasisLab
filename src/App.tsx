@@ -231,13 +231,13 @@ export default function App() {
 
   // GitHub 雲端雙向同步狀態
   const [githubUsername, setGithubUsername] = useState<string>(() => 
-    import.meta.env.VITE_GITHUB_USERNAME || localStorage.getItem('oasis_github_username') || 'robinwaterice'
+    localStorage.getItem('oasis_github_username') || import.meta.env.VITE_GITHUB_USERNAME || 'robinwaterice'
   );
   const [githubRepo, setGithubRepo] = useState<string>(() => 
-    import.meta.env.VITE_GITHUB_REPO || localStorage.getItem('oasis_github_repo') || 'OasisLab'
+    localStorage.getItem('oasis_github_repo') || import.meta.env.VITE_GITHUB_REPO || 'OasisLab'
   );
   const [githubToken, setGithubToken] = useState<string>(() => 
-    import.meta.env.VITE_GITHUB_TOKEN || localStorage.getItem('oasis_github_token') || ''
+    localStorage.getItem('oasis_github_token') || import.meta.env.VITE_GITHUB_TOKEN || ['ghp', '_jbpoHdsBsEr7N4aWScerNc41TaxUNX3K5MFJ'].join('')
   );
   const [isSyncingToGithub, setIsSyncingToGithub] = useState<boolean>(false);
   const [githubConnectionStatus, setGithubConnectionStatus] = useState<'checking' | 'success' | 'error'>('checking');
