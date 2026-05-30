@@ -623,4 +623,4 @@ export const PRODUCTS: Product[] = [
   }
 ];
 
-export const DATA_VERSION: number = 1780113078573;
+export const DATA_VERSION: number = 1780114439891;
